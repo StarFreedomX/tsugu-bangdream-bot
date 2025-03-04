@@ -87,11 +87,10 @@ async function drawCardDetail(cardId: number, displayedServerList: Server[] = gl
     var skill = new Skill(card.skillId)
     list.push(await drawSkillInList({ key: '技能', card: card, content: skill }, displayedServerList))
     list.push(line)
-
+    
     //标题
     list.push(await drawListByServerList(card.prefix, '标题', displayedServerList))
     list.push(line)
-
     //判断是否来自卡池
     for (let j = 0; j < displayedServerList.length; j++) {
         var releaseFromGacha = false
@@ -116,8 +115,7 @@ async function drawCardDetail(cardId: number, displayedServerList: Server[] = gl
         }
     }
 
-
-
+    
     //发售日期
     list.push(await drawTimeInList({
         key: '发布日期',
@@ -137,7 +135,7 @@ async function drawCardDetail(cardId: number, displayedServerList: Server[] = gl
 
     //演出缩略图
     list.push(await drawSdcharaInList(card))
-
+    
     //创建最终输出数组
     var listImage = drawDatablock({ list })
     var all = []
@@ -148,6 +146,7 @@ async function drawCardDetail(cardId: number, displayedServerList: Server[] = gl
     var tempGachaIdList = []
     var eventImageList: Array<Canvas | Image> = []
     var gachaImageList: Array<Canvas | Image> = []
+    
     for (let k = 0; k < displayedServerList.length; k++) {
         let server = displayedServerList[k];
         //如果卡牌有关联活动
@@ -200,7 +199,7 @@ async function drawCardDetail(cardId: number, displayedServerList: Server[] = gl
     else {
         var BGimage = await card.getCardIllustrationImage(true)
     }
-
+    
     var buffer = await outputFinalBuffer({
         imageList: all,
         useEasyBG: useEasyBG,

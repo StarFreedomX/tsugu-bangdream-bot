@@ -4,6 +4,7 @@ import { readJSON } from '@/types/utils'
 import { readExcelFile } from '@/types/utils'
 import { logger } from '@/logger'
 import * as path from 'path'
+import { Server } from './Server'
 
 const mainAPI: object = {}//main对象,用于存放所有api数据,数据来源于Bestdori网站
 
@@ -24,7 +25,6 @@ async function loadMainAPI(useCache: boolean = false) {
     });
 
     await Promise.all(promiseAll);
-
     const cardsCNfix = await readJSON(path.join(configPath, 'cardsCNfix.json'))
     for (var key in cardsCNfix) {
         mainAPI['cards'][key] = cardsCNfix[key]

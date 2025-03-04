@@ -5,6 +5,7 @@ import { drawDottedLine } from '@/image/dottedLine'
 import { Server, getServerByPriority, getIcon } from '@/types/Server'
 import { stackImageHorizontal } from '@/components/utils';
 import { globalDefaultServer } from '@/config';
+import { setFontStyle } from '@/image/text';
 
 //表格用默认虚线
 export const line: Canvas = drawDottedLine({
@@ -26,8 +27,10 @@ interface ListOptions {
     textSize?: number;
     lineHeight?: number;
     spacing?: number;
+    lineSpacing?: number;
     color?: string;
     maxWidth?: number;
+    align?: "top" | "bottom" | "center"
 }
 
 //画表格中的一行
@@ -78,6 +81,79 @@ export function drawList({
     return canvas;
 }
 
+//文字使用textSize，不缩放图片
+export function drawListTextWithImages({
+    key,
+    content,
+    textSize = 40,
+    spacing = textSize / 3,
+    lineSpacing = 20,
+    color = '#505050',
+    maxWidth = 800,
+    align = "center"
+}: ListOptions): Canvas {
+    const keyImage = drawRoundedRectWithText({
+        text: key,
+        textSize: 30,
+    });
+
+    var textImage: Canvas = new Canvas(1, 1)
+    var Width = 20, Height = 0
+    {
+        const ctx = textImage.getContext('2d')
+        setFontStyle(ctx, textSize, 'old')
+        for (const element of content) {
+            if (typeof element === "string") {
+                // Width += ctx.measureText(element).width
+                Height = Math.max(Height, textSize)
+            }
+            else {
+                // Width += element.width
+                Height = Math.max(Height, element.height)
+            }
+            // Width += spacing
+        }
+        // Width -= spacing
+    }
+    textImage = new Canvas(maxWidth, Height + lineSpacing)
+    {
+        const ctx = textImage.getContext('2d')
+        ctx.textBaseline = 'alphabetic'
+        setFontStyle(ctx, textSize, 'old');
+        ctx.fillStyle = color;
+        var x = 20
+        for (const element of content) {
+            var y = lineSpacing / 2, tempHeight = typeof element === "string" ? textSize / 3 * 4 : element.height
+            if (align == 'top')
+                y += 0
+            else if (align == 'bottom')
+                y += Height - tempHeight
+            else 
+                y += (Height - tempHeight) / 2
+            if (typeof element === "string") {
+                ctx.fillText(element, x, y + textSize)
+                x += ctx.measureText(element).width
+            }
+            else {
+                ctx.drawImage(element, x, y)
+                x += element.width
+            }
+            x += spacing
+        }
+    }
+    if (key == undefined) {
+        return textImage
+    }
+    var ymax = textImage.height + keyImage.height + 10;
+    const canvas = new Canvas(maxWidth, ymax);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(keyImage, 0, 0);
+    if(textImage.height != 0){
+        ctx.drawImage(textImage, 0, keyImage.height + 10);
+    }
+    return canvas;
+}
+
 interface tipsOptions {
     text?: string;
     content?: Array<string | Canvas | Image>
@@ -122,7 +198,6 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
     
     // 获取每个服务器的内容对应关系
     const contentMap = new Map<string, Server[]>()
-
     // 分组服务器，根据相同的内容将服务器归类
     for (let i = 0; i < serverList.length; i++) {
         const tempServer = serverList[i];
@@ -149,7 +224,6 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
             tempcontent.push('\n');
         }
     }
-
     // 如果所有服务器内容都为空，选择优先级最高的服务器
     if (tempcontent.length == 0) {
         const tempServer = getServerByPriority(content, serverList);
@@ -157,7 +231,6 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
         tempcontent.push(content[tempServer]);
         tempcontent.push('\n');
     }
-
     // 去掉最后一个换行符
     tempcontent.pop();
 
@@ -166,27 +239,49 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
         content: tempcontent,
         maxWidth
     });
-
     return canvas;
 }
 
 
 //横向组合较短list，高度为最高的list，宽度平分
-export function drawListMerge(imageList: Array<Canvas | Image>): Canvas {
+export function drawListMerge(imageList: Array<Canvas | Image>, maxWidth: number = 800, drawLine: boolean = false, align: "top" | "bottom" | "center" = "top"): Canvas {
     var maxHeight = 0
     for (let i = 0; i < imageList.length; i++) {
         const element = imageList[i];
-        if (element.height > maxHeight) {
+        if (element && element.height > maxHeight) {
             maxHeight = element.height
         }
     }
-    var canvas = new Canvas(800, maxHeight)
+    var canvas = new Canvas(maxWidth, maxHeight)
     var ctx = canvas.getContext('2d')
     var x = 0
+    const line: Canvas = drawDottedLine({
+        width: 10,
+        height: canvas.height,
+        startX: 5,
+        startY: 5,
+        endX: 5,
+        endY: canvas.height - 5,
+        radius: 2,
+        gap: 10,
+        color: "#a8a8a8"
+    })
     for (let i = 0; i < imageList.length; i++) {
         const element = imageList[i];
-        ctx.drawImage(element, x, 0)
-        x += 800 / imageList.length
+        if (element) {
+            var y
+            if (align == "top")
+                y = 0
+            else if (align == "bottom")
+                y = maxHeight - element.height
+            else 
+                y = (maxHeight - element.height) / 2
+            ctx.drawImage(element, x, y)
+            if (drawLine && i > 0) {
+                ctx.drawImage(line, x - 5, 0)
+            }
+        }
+        x += maxWidth / imageList.length
     }
     return canvas
 }

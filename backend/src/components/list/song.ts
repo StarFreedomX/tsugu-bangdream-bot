@@ -4,7 +4,7 @@ import { Server, getServerByPriority } from "@/types/Server"
 import { Song } from "@/types/Song"
 import { drawText, setFontStyle } from "@/image/text"
 import { resizeImage } from "@/components/utils"
-import { drawDifficulityList, drawDifficulity } from "@/components/list/difficulty"
+import { drawDifficulityList, drawDifficulity, drawDifficulityListWithDiff } from "@/components/list/difficulty"
 import { globalDefaultServer } from "@/config"
 import { drawList } from '../list'
 import { drawDottedLine } from '@/image/dottedLine'
@@ -91,4 +91,66 @@ export async function drawSongListInList(songs: Song[], difficulty?: number, tex
         lineHeight: canvas.height + 20,
         spacing: 0
     })
+}
+
+export async function drawSongInListBig(song: Song, difficulty?: number, displayedServerList: Server[] = globalDefaultServer): Promise<Canvas> {
+    var server = getServerByPriority(song.publishedAt, displayedServerList)
+    const width = 400, spacing = 20, jacketSize = 250
+    var titleImage = drawText({
+        text: song.musicTitle[server],
+        textSize: 40,
+        maxWidth: width - 2 * spacing
+    })
+    var bandImage = drawText({
+        text: new Band(song.bandId).bandName[server],
+        textSize: 30,
+        maxWidth: width - 2 * spacing
+    })
+    var topHeight = titleImage.height + bandImage.height
+    var canvas = new Canvas(width, jacketSize + 150 + topHeight)
+    var ctx = canvas.getContext("2d")
+    ctx.drawImage(titleImage, 20, 0)
+    ctx.drawImage(bandImage, 20, titleImage.height)
+    ctx.drawImage(await song.getSongJacketImage(), (width - jacketSize) / 2, topHeight + spacing, jacketSize, jacketSize)
+    var IDImage = drawText({
+        text: 'ID:' + song.songId.toString(),
+        textSize: 30,
+        lineHeight: 37.5,
+        maxWidth: jacketSize,
+        color: '#a7a7a7'
+    })
+    ctx.drawImage(IDImage, (width - jacketSize) / 2, topHeight + spacing + jacketSize)
+    var difficultyImage = drawDifficulityListWithDiff(song, difficulty, 60, 10)
+    // if (difficulty == undefined) {
+    //     var difficultyImage = drawDifficulityList(song, 60, 10)
+    // }
+    // else {
+    //     var difficultyImage = drawDifficulity(difficulty, song.difficulty[difficulty].playLevel, 45)
+    // }
+    ctx.drawImage(difficultyImage, (width - difficultyImage.width) / 2, jacketSize + IDImage.height + spacing + spacing + topHeight)
+    return canvas
+}
+export async function drawSongInListMid(song: Song, difficulty?: number, displayedServerList: Server[] = globalDefaultServer): Promise<Canvas> {
+    var server = getServerByPriority(song.publishedAt, displayedServerList)
+    const height = 210, spacing = 10, jacketSize = 180
+    var canvas = new Canvas(jacketSize + 150, height)
+    var ctx = canvas.getContext("2d")
+    ctx.drawImage(await song.getSongJacketImage(), 0, 0, jacketSize, jacketSize)
+    var IDImage = drawText({
+        text: 'ID:' + song.songId.toString(),
+        textSize: 30,
+        lineHeight: 37.5,
+        maxWidth: jacketSize,
+        color: '#a7a7a7'
+    })
+    ctx.drawImage(IDImage, 0, jacketSize)
+    var difficultyImage = drawDifficulity(difficulty, song.difficulty[difficulty].playLevel, 60)
+    // if (difficulty == undefined) {
+    //     var difficultyImage = drawDifficulityList(song, 60, 10)
+    // }
+    // else {
+    //     var difficultyImage = drawDifficulity(difficulty, song.difficulty[difficulty].playLevel, 45)
+    // }
+    ctx.drawImage(difficultyImage, jacketSize + spacing, (jacketSize - difficultyImage.height) / 2)
+    return canvas
 }

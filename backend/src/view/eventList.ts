@@ -53,6 +53,12 @@ export async function drawEventList(matches: FuzzySearchResult, displayedServerL
             isMatch = false;
         }
 
+        
+        if (matches._number != undefined) {
+            if (isMatch || Object.keys(matches).length == 1) {
+                isMatch = matches._number.includes(tempEvent.eventId)
+            }
+        }
         //如果有数字关系词，则判断关系词
         if (matches._relationStr != undefined) {
             //如果之后范围的话则直接判断
