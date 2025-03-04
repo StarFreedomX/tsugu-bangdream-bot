@@ -3,7 +3,7 @@ import { body } from 'express-validator';
 import { fuzzySearch } from '@/fuzzySearch';
 import { listToBase64 } from '@/routers/utils';
 import { isServerList } from '@/types/Server';
-import { drawSongChart } from '@/view/songChart';
+import { drawCommunitySongChart, drawSongChart } from '@/view/songChart';
 import { getServerByServerId, Server } from '@/types/Server';
 import { middleware } from '@/routers/middleware';
 import { Request, Response } from 'express';
@@ -27,6 +27,29 @@ router.post(
 
         try {
             const result = await commandSongChart(displayedServerList, songId, compress, difficultyId);
+            res.send(listToBase64(result));
+        } catch (e) {
+            console.log(e);
+            res.status(500).send({ status: 'failed', data: '内部错误' });
+        }
+    }
+);
+
+router.post(
+    '/community',
+    [
+        // Express-validator checks for type validation
+        body('songId').isInt(),
+        body('compress').optional().isBoolean(),
+    ],
+    middleware,
+    async (req: Request, res: Response) => {
+
+
+        const { songId, compress} = req.body;
+
+        try {
+            const result = await drawCommunitySongChart(songId, compress);
             res.send(listToBase64(result));
         } catch (e) {
             console.log(e);
