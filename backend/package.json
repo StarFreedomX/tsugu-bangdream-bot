@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-tsugu-bangdream-bot",
-  "description": "BanG Dream！少女乐团派对 多功能bot",
+  "description": "BanG Dream! 少女乐团派对 多功能bot",
   "version": "0.0.4",
   "contributors": [
     "Yamamoto <1810972564qq@gmail.com>",
@@ -20,7 +20,9 @@
     "assets"
   ],
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "start": "ts-node -r tsconfig-paths/register src/app.ts"
+  },
   "keywords": [
     "chatbot",
     "koishi",
@@ -34,10 +36,8 @@
   "dependencies": {
     "@types/level": "^6.0.3",
     "axios": "^1.6.8",
-    "bitset": "^5.2.3",
-    "chart.js": "^3.9.1",
+    "chart.js": "^4.4.8",
     "chartjs-adapter-moment": "^1.0.1",
-    "chartjs-node-canvas": "^4.1.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.0.1",
@@ -46,13 +46,14 @@
     "skia-canvas": "^1.0.2",
     "sqlite3": "^5.1.7",
     "svg2img": "^1.0.0-beta.2",
+    "ts-node": "^10.9.2",
     "validator": "^13.9.0",
     "xlsx": "^0.18.5"
   },
   "koishi": {
     "description": {
       "en": "BanG Dream! girs band party bot, data from https://bestdori.com/",
-      "zh": "BanG Dream！少女乐团派对 多功能bot, 数据来自 https://bestdori.com/"
+      "zh": "BanG Dream! 少女乐团派对 多功能bot, 数据来自 https://bestdori.com/"
     },
     "service": {
       "required": [

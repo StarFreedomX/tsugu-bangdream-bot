@@ -76,7 +76,7 @@ if (process.env.ARTICLE == 'true') {
     app.use('/eventReport', eventReportRouter);
 }
 
-const port: number = parseInt(process.env.PORT || '3002');
+const port: number = parseInt(process.env.BACKEND_PORT || '3000');
 
 if (isNaN(port)) {
     logger('expressMainThread', 'port is not a number');
