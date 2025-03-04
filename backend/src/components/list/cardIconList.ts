@@ -43,8 +43,8 @@ export async function drawCardListInList({
     var textSize = lineHeight / 200 * 180
     var spacing = lineHeight / 200 * 13
     if (cardIdVisible) {
-        textSize / 180 * 30
-        lineHeight / 200 * 230
+        textSize += textSize / 180 * 30
+        lineHeight = lineHeight / 200 * 230
     }
     var list: Array<Canvas> = []
     for (let i = 0; i < cardList.length; i++) {

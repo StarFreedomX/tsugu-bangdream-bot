@@ -5,6 +5,8 @@ import { getServerByPriority, Server } from '@/types/Server'
 import mainAPI from '@/types/_Main'
 import { Bestdoriurl } from '@/config'
 import { stringToNumberArray } from '@/types/utils'
+import { duration } from 'moment'
+import { Skill } from './Skill'
 
 export const difficultyName = {//难度名称
     0: "easy",
@@ -208,7 +210,7 @@ export class Song {
         }
         return tagNameList[this.tag]
     }
-    async getSongChart(difficultyId: number): Promise<Object> {
+    async getSongChart(difficultyId: number): Promise<any> {
         const songChart = await callAPIAndCacheResponse(`${Bestdoriurl}/api/charts/${this.songId}/${difficultyName[difficultyId]}.json`)
         return songChart
     }
@@ -239,8 +241,258 @@ export class Song {
         var scoreParameter = skillParameter * (1.1 * accruacy / 100 + 0.8 * (1 - accruacy / 100))
         return scoreParameter
     }
+    getMaxMetaDiffId(withFever: boolean = true): number{
+        var maxDiff = 0, maxMeta = 0
+        for (var i in this.difficulty) {
+            const difficultyId = parseInt(i)
+            const meta = this.calcMeta(withFever, difficultyId)
+            if (meta > maxMeta) {
+                maxDiff = difficultyId
+                maxMeta = meta
+            }
+        }
+        return maxDiff
+    }
+    async getChartData(diff: number) {
+        const origin = await this.getSongChart(diff)
+        const timepoints = origin.filter(n => n.type === 'BPM')
+        const chart = new Chart()
+        chart.level = this.difficulty[diff].playLevel
+        timepoints.sort((a, b) => a.beat - b.beat)
+        timepoints.forEach((tp, i, a) => {
+            if (i === 0) a[i].time = 0
+            else a[i].time = a[i - 1].time + (tp.beat - a[i - 1].beat) * (60 / a[i - 1].bpm)
+        })
+        const getTime = beat => {
+            let lastBPM = timepoints[0]
+            for (let i = 0; i < timepoints.length; i++) {
+                if (timepoints[i].beat > beat) break
+                lastBPM = timepoints[i]
+            }
+            return lastBPM.time + 60 / lastBPM.bpm * (beat - lastBPM.beat)
+        }
+    
+        origin.forEach((n) => {
+            if (n.type === "Long" || n.type === "Slide") {
+                n.connections.forEach((c) => {
+                    if (c.hidden)
+                        return
+                    const time = getTime(c.beat)
+                    chart.nodes.push({ type: c.skill ? "skill" : "node", time })
+                    chart.count += 1
+                })
+            } else if (n.type == "Single" || n.type === "Directional") {
+                const time = getTime(n.beat)
+                chart.nodes.push({ type: n.skill ? "skill" : "node", time })
+                chart.count += 1
+            }
+        })
+
+        chart.nodes.sort((a, b) => {
+            const val = {
+                skill: 0,
+                node: 1
+            }
+            if (sgn(a.time - b.time) != 0) {
+                return sgn(a.time - b.time)
+            }
+            return val[a.type] - val[b.type]
+        })
+        return chart
+    }
 }
 
+function sgn(x: number) {
+    const eps = 0.001
+    return Number(x > eps) - Number(x < -eps)
+}
+
+export function getComboMod(combo: number, isMedley: boolean = false) {
+    if (combo <= 20)
+        return 1
+    if (combo <= 300)
+        return 1 + 0.01 * Math.ceil(combo / 50)
+    if (combo <= 700 || isMedley && combo <= 3000)
+        return 1.03 + 0.01 * Math.ceil(combo / 100)
+    if (!isMedley)
+        return 1.11
+    return 1.34
+}
+
+export class Chart {
+    nodes: Array<{
+        type: "node" | "skill"
+        time: number
+    }>
+    level: number
+    count: number
+    combo: number
+    warning: Array<{
+        id: number
+        timeGap: number
+    }>
+    meta: {
+        noSkill: number
+        skill: Array<{
+            [duration: number]: number
+        }>
+        '100+0.5p': Array<{
+            [duration: number]: number
+        }>
+    }
+    constructor() {
+        this.nodes = []
+        this.count = 0
+    }
+    init(combo: number = 0) {
+        this.combo = combo
+        const durationList = [3, 3.5, 4, 4.5, 5, 5.5, 5.6, 5.7, 6, 6.2, 6.4, 6.5, 6.8, 7, 7.2, 7.5, 8]
+        const durationList2 = [5, 5.5, 6, 6.5, 7]
+        this.meta = {
+            noSkill: 0,
+            skill: [],
+            '100+0.5p': []
+        }
+        const base = 3 * (1 + 0.01 * (this.level - 5)) / this.count * 1.1
+        for (var i = 0; i < this.nodes.length; i += 1) {
+            const node = this.nodes[i]
+            combo += 1
+            this.meta.noSkill += base * getComboMod(combo, true)
+            if (node.type == 'skill') {
+                {
+                    const skill = {}
+                    for (const duration of durationList) {
+                        var tempCombo = combo
+                        skill[duration] = 0
+                        for (var j = i + 1; ; j += 1) {
+                            if (sgn(this.nodes[j].time - node.time - duration - 1/30) > 0) {
+                                break
+                            }
+                            tempCombo += 1
+                            skill[duration] += base * getComboMod(tempCombo, true)
+                        }
+                    }
+                    this.meta.skill.push(skill)
+                }
+                {
+                    const skill = {}
+                    for (const duration of durationList2) {
+                        var tempCombo = combo, skillMod = 200
+                        skill[duration] = 0
+                        for (var j = i + 1; ; j += 1) {
+                            if (skillMod < 300)
+                                skillMod += 1
+                            if (sgn(this.nodes[j].time - node.time - duration - 1/30) > 0) {
+                                break
+                            }
+                            tempCombo += 1
+                            skill[duration] += base * getComboMod(tempCombo, true) * skillMod / 200
+                        }
+                    }
+                    this.meta['100+0.5p'].push(skill)
+                }
+            }
+        }
+        const skills = this.nodes.filter((node) => node.type == 'skill')
+        for (var i = 0; i < skills.length - 1; i += 1) {
+            if (skills[i + 1].time - skills[i].time < 8.75) {
+                this.warning.push({
+                    id: i + 1,
+                    timeGap: skills[i + 1].time - skills[i].time
+                })
+            }
+        }
+    }
+    getSkillMeta(i: number, duration: number, scoreUpMaxValue: number, rateup: boolean) {
+        if (rateup)
+            return this.meta['100+0.5p'][i][duration]
+        return this.meta.skill[i][duration] * scoreUpMaxValue
+    }
+    getMaxMetaOrder(list) {
+        const dp = new Array<number>(1 << 5).fill(0), choose = new Array<number>(1 << 5).fill(0)
+        dp[0] = this.meta.noSkill
+        for (var i = 0; i < 1 << 5; i += 1) {
+            var k = 0
+            for (var j = 0; j < 5; j += 1) {
+                if (i >> j & 1)
+                    k += 1
+            }
+            for (var j = 0; j < 5; j += 1) {
+                if (i >> j & 1)
+                    continue
+                const tmp = dp[i] + this.getSkillMeta(k, list[j].duration, list[j].scoreUpMaxValue, list[j].rateup)
+                if (tmp > dp[i | 1 << j]) {
+                    dp[i | 1 << j] = tmp
+                    choose[i | 1 << j] = j
+                }
+            }
+        }
+
+        var meta = 0, capital
+        for (var i = 0; i < 5; i++) {
+            const tmp = this.getSkillMeta(5, list[i].duration, list[i].scoreUpMaxValue, list[i].rateup)
+            if (tmp > meta) {
+                meta = tmp
+                capital = list[i]
+            }
+        }
+        meta += dp[(1 << 5) - 1]
+
+        const order = []
+        var i = (1 << 5) - 1
+        while (i != 0) {
+            order.push(choose[i])
+            i ^= 1 << choose[i]
+        }
+        order.reverse()
+        const team = order.map(i => list[i])
+        return { meta, team, capital }
+    }
+
+    getScore(cardList, stat) {
+        const base = 3 * stat * (1 + 0.01 * (this.level - 5)) / this.count
+        var result = 0, skillCount = 0, combo = this.combo, skillMod = 1, rateup = false
+        const event = []
+        for (var i = 0; i < this.nodes.length; i += 1) {
+            const node = this.nodes[i]
+            if (event.length > 0 && sgn(node.time - event[0].time) > 0) {
+                skillMod = event[0].skillMod
+                rateup = event[0].rateup
+                event.shift()
+            }
+            combo += 1
+            if (rateup && sgn(skillMod - 2.5) < 0)
+                skillMod += 0.005
+            result += Math.floor(Math.floor(base * getComboMod(combo, true) * 1.1) * skillMod)
+            if (node.type == 'skill') {
+                if (event.length > 0) {
+                    const startTime = event.at(-1).time + 0.75
+                    event.push({
+                        time: startTime,
+                        skillMod: 1 + cardList[skillCount].scoreUpMaxValue,
+                        rateup: cardList[skillCount].rateup
+                    })
+                    event.push({
+                        time: startTime + cardList[skillCount].duration + 1/30,
+                        skillMod: 1,
+                        rateup: false
+                    })
+                }
+                else {
+                    skillMod = 1 + cardList[skillCount].scoreUpMaxValue
+                    rateup = cardList[skillCount].rateup
+                    event.push({
+                        time: node.time + cardList[skillCount].duration + 1/30,
+                        skillMod: 1,
+                        rateup: false
+                    })
+                }
+                skillCount += 1
+            }
+        }
+        return result
+    }
+}
 //获取时间范围内指定服务器推出的新歌
 export function getPresentSongList(mainServer: Server, start: number = Date.now(), end: number = Date.now()): Song[] {
     var songList: Array<Song> = []

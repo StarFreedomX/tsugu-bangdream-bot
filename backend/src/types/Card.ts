@@ -31,11 +31,28 @@ const typeName = {
     'dreamfes': '梦幻Fes限定',
     'kirafes': '闪光Fes限定',
 }
-
+export function emptyStat(): Stat {
+    return {
+        performance: 0,
+        technique: 0,
+        visual: 0
+    }
+}
+export function statSum(stat: Stat): number {
+    return stat.performance + stat.technique + stat.visual
+}
 export function addStat(stat: Stat, add: Stat): void {//综合力相加函数
     stat.performance += add.performance
     stat.technique += add.technique
     stat.visual += add.visual
+}
+
+export function mulStat(stat: Stat, mul: Stat): Stat {//综合力相乘函数
+    return {
+        performance: stat.performance * mul.performance,
+        technique: stat.technique * mul.technique,
+        visual: stat.visual * mul.visual
+    }
 }
 
 function limitBreakRankStat(rarity: number) {//不同稀有度突破一级增加的属性
@@ -187,54 +204,87 @@ export class Card {
     }
 
     //计算综合力函数
-    async calcStat(level?: number, trainingStatus: boolean = false, limitBreakRank: number = 0, episode1: boolean = true, episode2: boolean = true) {
-        if (!this.isInitFull) {
-            //如果不是默认情况(带有level以外的参数)，加载完整数据，其中包含完整综合力数据
-            /*
-            if (trainingStatus != undefined || limitBreakRank != undefined || episode1 != undefined || episode2 != undefined) {
-                await this.initFull()
-            }
-            */
+    // async calcStat(level?: number, trainingStatus: boolean = false, limitBreakRank: number = 0, episode1: boolean = true, episode2: boolean = true, ) {
+    //     if (!this.isInitFull) {
+    //         //如果不是默认情况(带有level以外的参数)，加载完整数据，其中包含完整综合力数据
+    //         /*
+    //         if (trainingStatus != undefined || limitBreakRank != undefined || episode1 != undefined || episode2 != undefined) {
+    //             await this.initFull()
+    //         }
+    //         */
+    //         await this.initFull()
+
+    //     }
+    //     const stat: Stat = {
+    //         performance: 0,
+    //         technique: 0,
+    //         visual: 0
+    //     }
+
+    //     var maxLevel = this.getMaxLevel()
+    //     level ??= maxLevel//如果没有等级参数，则默认为最大等级
+    //     if (level > maxLevel) {//等级超过上限,按上限计算
+    //         level = maxLevel
+    //     }
+    //     if (this.ableToTraining()) {//如果能够进行特训
+    //         if (level > this.levelLimit) {//如果等级超过需要特训等级，则默认已经特训
+    //             trainingStatus = true
+    //         }
+    //     }
+
+    //     addStat(stat, this.stat[level.toString()])//加上等级对应的属性
+
+    //     if (trainingStatus) {//如果已经特训
+    //         addStat(stat, this.stat['training'])
+    //     }
+    //     if (this.stat['episodes'] != undefined) {//如果有剧情
+    //         if (episode1) {//如果已经阅读剧情1
+    //             addStat(stat, this.stat['episodes'][0])
+    //         }
+    //         if (episode2) {//如果已经阅读剧情2
+    //             addStat(stat, this.stat['episodes'][1])
+    //         }
+    //     }
+
+    //     if (limitBreakRank > 0) {
+    //         for (var i = 1; i <= limitBreakRank; i++) {
+    //             addStat(stat, limitBreakRankStat(this.rarity))
+    //         }
+    //     }
+    //     return stat
+    // }
+    async calcStat(cardData?) {
+        const level = cardData ? cardData.level : this.getMaxLevel()
+        if(!this.stat[level.toString()]) {
             await this.initFull()
-
         }
-        const stat: Stat = {
-            performance: 0,
-            technique: 0,
-            visual: 0
+        const stat: Stat = this.stat[level.toString()], res: Stat = {
+            performance: stat.performance,
+            technique: stat.technique,
+            visual: stat.visual
         }
-
-        var maxLevel = this.getMaxLevel()
-        level ??= maxLevel//如果没有等级参数，则默认为最大等级
-        if (level > maxLevel) {//等级超过上限,按上限计算
-            level = maxLevel
-        }
-        if (this.ableToTraining()) {//如果能够进行特训
-            if (level > this.levelLimit) {//如果等级超过需要特训等级，则默认已经特训
-                trainingStatus = true
+        if (cardData) {
+            // console.log(cardData)
+            if (cardData.userAppendParameter) {
+                const userAppend = cardData.userAppendParameter
+                const appendStat: Stat = {
+                    performance: userAppend.performance + (userAppend.characterPotentialPerformance || 0) + (userAppend.characterBonusPerformance || 0),
+                    technique: userAppend.technique + (userAppend.characterPotentialTechnique || 0) + (userAppend.characterBonusTechnique || 0),
+                    visual: userAppend.visual + (userAppend.characterPotentialVisual || 0) + (userAppend.characterBonusVisual || 0)
+                }
+                addStat(res, appendStat)
             }
+            return res
         }
-
-        addStat(stat, this.stat[level.toString()])//加上等级对应的属性
-
-        if (trainingStatus) {//如果已经特训
-            addStat(stat, this.stat['training'])
+        if (this.ableToTraining()) {
+            addStat(res, this.stat['training'])
         }
         if (this.stat['episodes'] != undefined) {//如果有剧情
-            if (episode1) {//如果已经阅读剧情1
-                addStat(stat, this.stat['episodes'][0])
-            }
-            if (episode2) {//如果已经阅读剧情2
-                addStat(stat, this.stat['episodes'][1])
-            }
+            addStat(res, this.stat['episodes'][0])
+            addStat(res, this.stat['episodes'][1])
         }
 
-        if (limitBreakRank > 0) {
-            for (var i = 1; i <= limitBreakRank; i++) {
-                addStat(stat, limitBreakRankStat(this.rarity))
-            }
-        }
-        return stat
+        return res
     }
     getSkill(): Skill {
         return new Skill(this.skillId)
@@ -287,6 +337,13 @@ export class Card {
         var tempServer = this.getFirstReleasedServer()
         var CardIllustrationImageBuffer = await downloadFile(`${Bestdoriurl}/assets/${Server[tempServer]}/characters/resourceset/${this.resourceSetName}_rip/trim${trainingString}.png`)
         return await loadImage(CardIllustrationImageBuffer)
+    }
+    async getCardTrimImageBuffer(trainingStatus: boolean): Promise<Buffer> {
+        trainingStatus = this.ableToTraining(trainingStatus)
+        const trainingString = trainingStatus ? '_after_training' : '_normal'
+        var tempServer = this.getFirstReleasedServer()
+        var CardIllustrationImageBuffer = await downloadFile(`${Bestdoriurl}/assets/${Server[tempServer]}/characters/resourceset/${this.resourceSetName}_rip/trim${trainingString}.png`)
+        return CardIllustrationImageBuffer
     }
     getTypeName() {
         if (typeName[this.type] == undefined) {

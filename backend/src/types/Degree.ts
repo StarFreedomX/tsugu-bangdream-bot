@@ -4,6 +4,9 @@ import { downloadFile } from '@/api/downloadFile';
 import { Canvas, Image, loadImage } from 'skia-canvas';
 import mainAPI from '@/types/_Main';
 import { Bestdoriurl } from '@/config';
+import { loadImageFromPath } from '@/image/utils';
+import { assetsRootPath } from "@/config";
+import * as path from 'path'
 
 export class Degree {
     degreeId: number;
@@ -30,6 +33,8 @@ export class Degree {
         this.degreeName = degreeData['degreeName'];
     }
     async getDegreeImage(server: Server): Promise<Image> {
+        if (this.baseImageName[server].startsWith('ani'))
+            return loadImageFromPath(path.join(assetsRootPath, `/animedegree/${this.baseImageName[server]}.png`))
         var degreeImageBuffer = await downloadFile(`${Bestdoriurl}/assets/${Server[server]}/thumb/degree_rip/${this.baseImageName[server]}.png`)
         return loadImage(degreeImageBuffer)
     }
@@ -44,7 +49,7 @@ export class Degree {
     }
     async getDegreeIcon(server: Server): Promise<Image | Canvas> {
         var iconName = this.iconImageName[server] + "_" + this.rank[server]
-        if (iconName == "none_none") {//这个为空底图
+        if (this.iconImageName[server] == "none") {//这个为空底图
             return (new Canvas(1, 1))
         }
         var degreeIconBuffer = await downloadFileCache(`${Bestdoriurl}/assets/${Server[server]}/thumb/degree_rip/${iconName}.png`)

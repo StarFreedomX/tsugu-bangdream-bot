@@ -2,6 +2,10 @@ import mainAPI from '@/types/_Main';
 import { Server } from '@/types/Server';
 import { Card, Stat } from '@/types/Card';
 
+export enum AreaItemType {
+    band, attribute, magazine
+}
+export const AreaItemTypeList = ['乐队道具', '颜色道具', '杂志道具']
 
 export class AreaItem {
     areaItemId: number;
@@ -53,5 +57,34 @@ export class AreaItem {
             return emptyStat
         }
     }
-
+    getType(): AreaItemType {
+        if (this.targetBandIds.length == 1) {
+            return AreaItemType.band
+        }
+        if (this.targetAttributes.length == 1) {
+            return AreaItemType.attribute
+        }
+        if (this.areaItemId >= 80) {
+            return AreaItemType.magazine
+        }
+        if (this.areaItemId >= 73) {
+            return AreaItemType.band
+        }
+        return AreaItemType.attribute
+    }
+    getPercent(level: number): Stat {
+        if (level == 0) {
+            return {
+                performance: 0,
+                technique: 0,
+                visual: 0
+            }
+        }
+        let res: Stat = {
+            performance: parseFloat(this.performance[level.toString()][0]) / 100,
+            technique: parseFloat(this.technique[level.toString()][0]) / 100,
+            visual: parseFloat(this.visual[level.toString()][0]) / 100
+        }
+        return res
+    }
 }

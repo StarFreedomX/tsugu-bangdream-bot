@@ -124,9 +124,11 @@ export function fuzzySearch(keywordList: string[]): FuzzySearchResult {
 
     if (!matched) {
       if (!matches['_all']) {
-        matches['_all'] = [];
+        matches['_all'] = [keyword_org];
       }
-      matches['_all'].push(keyword_org);
+      else {
+        matches['_all'][0] += ' ' + keyword_org
+      }
     }
   }
   return matches;
@@ -215,7 +217,8 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
         if (Array.isArray(target[key])) {
           for (let j = 0; j < target[key].length; j++) {
             if (typeof target[key][j] === 'string') {
-              if (target[key][j].includes(matches['_all'][i] as string)) {
+              //@ts-ignore
+              if (target[key][j].toLowerCase().includes(matches['_all'][i].toLowerCase() as string)) {
                 match = true;
                 break;
               }

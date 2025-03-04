@@ -173,7 +173,14 @@ export function matchCardList(matches: FuzzySearchResult, displayedServerList: S
         }
         //console.log(tempCard.cardId, 2, isMatch)
 
+        if (matches._number != undefined) {
+            //如果之后范围的话则直接判断
+            if (isMatch || Object.keys(matches).length == 1) {
+                isMatch = matches._number.includes(tempCard.cardId)
+            }
+        }
         //如果有数字关系词，则判断关系词
+
         if (matches._relationStr != undefined) {
             //如果之后范围的话则直接判断
             if (isMatch || Object.keys(matches).length == 1) {

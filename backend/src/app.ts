@@ -20,6 +20,7 @@ import { eventReportRouter } from '@/routers/article/eventReport'
 import { eventStageRouter } from '@/routers/eventStage'
 import { songRandomRouter } from '@/routers/songRandom'
 import { fuzzySearchRouter } from '@/routers/fuzzySearch'
+import { medleyCalRouter } from '@/routers/medleyCal'
 
 import { logger } from '@/logger'
 import * as dotenv from 'dotenv';
@@ -49,8 +50,9 @@ app.use('/cutoffAll', cutoffAllRouter)
 app.use('/eventStage', eventStageRouter)
 app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);
+app.use('/medleyCal', medleyCalRouter);
 
-
+// console.log(process.env)
 if (process.env.LOCAL_DB == 'true') {
     app.use('/user', userRouter);
     app.use('/station', stationRouter);
@@ -74,7 +76,7 @@ if (process.env.ARTICLE == 'true') {
     app.use('/eventReport', eventReportRouter);
 }
 
-const port: number = parseInt(process.env.PORT || '3000');
+const port: number = parseInt(process.env.PORT || '3002');
 
 if (isNaN(port)) {
     logger('expressMainThread', 'port is not a number');

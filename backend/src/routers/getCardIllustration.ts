@@ -11,15 +11,16 @@ router.post('/',
   [
     // Define validation rules using express-validator
     body('cardId').isNumeric(),
+    body('trim').optional().isBoolean()
   ],
   middleware,
   async (req: Request, res: Response) => {
 
-    const { cardId } = req.body;
+    const { cardId, trim } = req.body;
 
     try {
       // Ensure cardId is a valid number (no need to check isNaN again)
-      const images = await commandGetCardIllustration(cardId);
+      const images = await commandGetCardIllustration(cardId, trim);
       res.send(listToBase64(images));
     } catch (error) {
       console.log(error);
@@ -28,7 +29,7 @@ router.post('/',
   }
 );
 
-async function commandGetCardIllustration(cardId: number): Promise<Array<Buffer | string>> {
+async function commandGetCardIllustration(cardId: number, trim?: boolean): Promise<Array<Buffer | string>> {
   let card = new Card(cardId);
   if (!card.isExist) {
     return ['错误: 该卡不存在']
@@ -37,7 +38,7 @@ async function commandGetCardIllustration(cardId: number): Promise<Array<Buffer 
   const imageList = [];
   for (let i = 0; i < trainingStatusList.length; i++) {
     const element = trainingStatusList[i];
-    const illustration = await card.getCardIllustrationImageBuffer(element);
+    const illustration = trim ? await card.getCardTrimImageBuffer(element) : await card.getCardIllustrationImageBuffer(element);
     // 直接添加插图到列表中，不需要绘制到Canvas
     imageList.push(illustration);
   }
