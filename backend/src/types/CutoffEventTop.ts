@@ -50,14 +50,14 @@ export class CutoffEventTop{
             this.status = 'in_progress';
         }
     }
-    async initFull(){
+    async initFull(interval = 3600000){
         if (!this.isExist){
             return
         }
         if(this.isInitfull){
             return;
         }
-        const topData = await callAPIAndCacheResponse(`${Bestdoriurl}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=3600000`);
+        const topData = await callAPIAndCacheResponse(`${Bestdoriurl}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`);
         if(topData == undefined){
             this.isExist = false;
             return;
