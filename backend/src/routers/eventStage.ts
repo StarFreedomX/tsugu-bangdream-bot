@@ -15,15 +15,17 @@ router.post(
     [
         body('mainServer').custom(isServer),
         body('eventId').optional().isInt(),
+        body('index').optional().isInt(),
+        body('date').optional().isInt(),
         body('meta').optional().isBoolean(),
         body('compress').optional().isBoolean(),
     ],
     middleware,
     async (req: Request, res: Response) => {
 
-        const { mainServer, eventId, meta, compress } = req.body;
+        const { mainServer, eventId, index, date, meta, compress } = req.body;
         try {
-            const result = await commandEventStage(getServerByServerId(mainServer), compress, meta, eventId);
+            const result = await commandEventStage(getServerByServerId(mainServer), compress, meta, eventId, index, date);
             res.send(listToBase64(result));
         } catch (e) {
             console.log(e);
@@ -32,13 +34,18 @@ router.post(
     }
 );
 
-export async function commandEventStage(mainServer: Server, compress: boolean, meta: boolean = false, eventId?: number): Promise<Array<Buffer | string>> {
-
+export async function commandEventStage(mainServer: Server, compress: boolean, meta: boolean = false, eventId?: number, index?: number, date?: number): Promise<Array<Buffer | string>> {
+    if (!eventId && !date) {
+        date = Date.now()
+    }
     if (!eventId) {
-        eventId = getPresentEvent(mainServer).eventId
+        eventId = getPresentEvent(mainServer, date).eventId
+    }
+    if (!date && !index) {
+        index = 1
     }
 
-    return await drawEventStage(eventId, mainServer, meta, compress);
+    return await drawEventStage(eventId, index, date ? new Date(date) : undefined, mainServer, meta, compress);
 }
 
 export { router as eventStageRouter }

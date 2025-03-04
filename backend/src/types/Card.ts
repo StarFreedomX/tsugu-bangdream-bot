@@ -29,11 +29,28 @@ const typeName = {
     'dreamfes': '梦幻Fes限定',
     'kirafes': '闪光Fes限定',
 }
-
+export function emptyStat(): Stat {
+    return {
+        performance: 0,
+        technique: 0,
+        visual: 0
+    }
+}
+export function statSum(stat: Stat): number {
+    return stat.performance + stat.technique + stat.visual
+}
 export function addStat(stat: Stat, add: Stat): void {//综合力相加函数
     stat.performance += add.performance
     stat.technique += add.technique
     stat.visual += add.visual
+}
+
+export function mulStat(stat: Stat, mul: Stat): Stat {//综合力相乘函数
+    return {
+        performance: stat.performance * mul.performance,
+        technique: stat.technique * mul.technique,
+        visual: stat.visual * mul.visual
+    }
 }
 
 function limitBreakRankStat(rarity: number) {//不同稀有度突破一级增加的属性
@@ -224,11 +241,15 @@ export class Card {
     //     return stat
     // }
     async calcStat(cardData?) {
-        if (!this.isInitFull) {
+        const level = cardData ? cardData.level : this.getMaxLevel()
+        if(!this.stat[level.toString()]) {
             await this.initFull()
         }
-        const level = cardData ? cardData.level : this.getMaxLevel()
-        const stat = this.stat[level.toString()]
+        const stat: Stat = this.stat[level.toString()], res: Stat = {
+            performance: stat.performance,
+            technique: stat.technique,
+            visual: stat.visual
+        }
         if (cardData) {
             // console.log(cardData)
             if (cardData.userAppendParameter) {
@@ -238,19 +259,19 @@ export class Card {
                     technique: userAppend.technique + (userAppend.characterPotentialTechnique || 0) + (userAppend.characterBonusTechnique || 0),
                     visual: userAppend.visual + (userAppend.characterPotentialVisual || 0) + (userAppend.characterBonusVisual || 0)
                 }
-                addStat(stat, appendStat)
+                addStat(res, appendStat)
             }
-            return stat
+            return res
         }
-        if(this.stat['training'] != undefined){//如果可以特训
-            addStat(stat, this.stat['training'])
+        if (this.ableToTraining()) {
+            addStat(res, this.stat['training'])
         }
         if (this.stat['episodes'] != undefined) {//如果有剧情
-            addStat(stat, this.stat['episodes'][0])
-            addStat(stat, this.stat['episodes'][1])
+            addStat(res, this.stat['episodes'][0])
+            addStat(res, this.stat['episodes'][1])
         }
 
-        return stat
+        return res
     }
     getSkill(): Skill {
         return new Skill(this.skillId)
@@ -303,6 +324,13 @@ export class Card {
         var tempServer = this.getFirstReleasedServer()
         var CardIllustrationImageBuffer = await downloadFile(`${Bestdoriurl}/assets/${Server[tempServer]}/characters/resourceset/${this.resourceSetName}_rip/trim${trainingString}.png`)
         return await loadImage(CardIllustrationImageBuffer)
+    }
+    async getCardTrimImageBuffer(trainingStatus: boolean): Promise<Buffer> {
+        trainingStatus = this.ableToTraining(trainingStatus)
+        const trainingString = trainingStatus ? '_after_training' : '_normal'
+        var tempServer = this.getFirstReleasedServer()
+        var CardIllustrationImageBuffer = await downloadFile(`${Bestdoriurl}/assets/${Server[tempServer]}/characters/resourceset/${this.resourceSetName}_rip/trim${trainingString}.png`)
+        return CardIllustrationImageBuffer
     }
     getTypeName() {
         if (typeName[this.type] == undefined) {

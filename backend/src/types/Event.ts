@@ -8,6 +8,7 @@ import { Character } from '@/types/Character';
 import { globalDefaultServer, Bestdoriurl } from '@/config';
 import { stringToNumberArray } from '@/types/utils'
 import { GetProbablyTimeDifference } from '@/components/list/time';
+import { Card } from './Card';
 
 const typeName = {
     "story": "一般活动 (协力)",
@@ -40,6 +41,12 @@ export class Event {
         pointPercent: number;
         parameterPercent: number;
     }
+    members: Array<{
+        eventId: number;
+        situationId: number;
+        percent: number;
+        seq: number;
+    }>;
     musics?: Array<
         Array<
             {
@@ -98,6 +105,8 @@ export class Event {
         visual?: number
     } = {}
 
+    limitBreaks: Array<Array<number>>
+
     //以下用于模糊搜索
     characterId: number[]
     attribute: string[]
@@ -120,6 +129,7 @@ export class Event {
         this.endAt = stringToNumberArray(eventData['endAt']);
         this.attributes = eventData['attributes'];
         this.characters = eventData['characters'];
+        this.members = eventData['members'];
         this.rewardCards = eventData['rewardCards'];
         //用于模糊搜索
         this.characterId = []
@@ -185,6 +195,11 @@ export class Event {
         */
         if (eventData['eventCharacterParameterBonus'] != undefined) {
             this.eventCharacterParameterBonus = eventData['eventCharacterParameterBonus']
+        }
+
+        this.limitBreaks = Array.from({ length: 6 }, () => (new Array<number>(5)).fill(0))
+        for (const { rarity, rank, percent } of eventData["limitBreaks"]) {
+            this.limitBreaks[rarity][rank] = percent
         }
 
         this.isInitfull = true
@@ -276,6 +291,21 @@ export class Event {
             }
         }
         return (characterList)
+    }
+    getMemberList() {
+        var member = this.members
+        var memberList: { [precent: string]: Array<Card> } = {}
+        for (const i in member) {
+            if (Object.prototype.hasOwnProperty.call(member, i)) {
+                const element = member[i];
+                var percent = element.percent
+                if (memberList[percent.toString()] == undefined) {
+                    memberList[percent.toString()] = []
+                }
+                memberList[percent.toString()].push(new Card(element.situationId))
+            }
+        }
+        return (memberList)
     }
     async getRewardStamp(server:Server): Promise<Image> {
         const allStamps = await callAPIAndCacheResponse(`${Bestdoriurl}/api/stamps/all.2.json`)

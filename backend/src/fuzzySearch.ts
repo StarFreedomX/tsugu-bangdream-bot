@@ -14,7 +14,7 @@ function loadConfig(): FuzzySearchConfig {
 }
 
 function extractLvNumber(str: string): number | null {
-  const regex = /^lv(\d+)$/i;
+  const regex = /^lv(\d+)$/;
   const match = str.match(regex);
   if (match && match[1]) {
     return parseInt(match[1], 10);
@@ -40,13 +40,7 @@ export function isFuzzySearchResult(value: any): boolean {
   );
 }
 
-export function fuzzySearch(keyword: string): FuzzySearchResult {
-  //兼容引号
-  const keywordList = (keyword.match(/["“”『』「」]([^"“”『』「」]+)["“”『』「」]|\S+/g) || []).map(item =>
-    item.replace(/^[\"“”『』「」]|[\"“”『』「」]$/g, '') // 去掉前后可能的中英文引号
-  );
-
-  console.log(keywordList)
+export function fuzzySearch(keywordList: string[]): FuzzySearchResult {
   const matches: { [key: string]: (string | number)[] } = {};
 
   for (var keyword_org of keywordList) {
@@ -130,12 +124,13 @@ export function fuzzySearch(keyword: string): FuzzySearchResult {
 
     if (!matched) {
       if (!matches['_all']) {
-        matches['_all'] = [];
+        matches['_all'] = [keyword_org];
       }
-      matches['_all'].push(keyword_org);
+      else {
+        matches['_all'][0] += ' ' + keyword_org
+      }
     }
   }
-
   return matches;
 }
 
@@ -162,29 +157,14 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
     if (key === '_number' || key === '_relationStr' || key === '_all') {
       continue;
     }
-
     // 匹配关键词
     if (target[key] !== undefined) {
-      // 处理 Array 类型
+      // 如果为Array类型
       if (Array.isArray(target[key])) {
         let matchArray = false;
         for (let i = 0; i < target[key].length; i++) {
           const element = target[key][i];
-
-          // 对比字符串（忽略大小写）
-          if (
-            typeof element === 'string' &&
-            matches[key].some((m: any) => typeof m === 'string' && m.toLowerCase() === element.toLowerCase())
-          ) {
-            matchArray = true;
-            break;
-          }
-
-          // 对比数字（songLevels 等）
-          if (
-            typeof element === 'number' &&
-            matches[key].some((m: any) => typeof m === 'number' && m === element)
-          ) {
+          if (matches[key].includes(element)) {
             matchArray = true;
             break;
           }
@@ -197,33 +177,9 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
           break;
         }
       }
-      // 处理 Object (string, number) 类型
+      // 如果为Object (string, number) 类型
       else {
-        if (
-          typeof target[key] === 'string' &&
-          matches[key].some((m: any) => typeof m === 'string' && m.toLowerCase() === target[key].toLowerCase())
-        ) {
-          match = true;
-          continue;
-        }
-
-        if (
-          typeof target[key] === 'number' &&
-          matches[key].some((m: any) => typeof m === 'number' && m === target[key])
-        ) {
-          match = true;
-          continue;
-        }
-
-        match = false;
-        break;
-      }
-    }
-
-    // 处理指定的数字类型 key，比如 songLevels
-    if (numberTypeKey.length > 0 && matches['_number'] !== undefined) {
-      if (numberTypeKey.includes(key)) {
-        if (matches['_number'].includes(target[key])) {
+        if (matches[key].includes(target[key])) {
           match = true;
           continue;
         } else {
@@ -232,18 +188,28 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
         }
       }
     }
+    // 如果为指定的数字类型key，匹配数字
+    if (numberTypeKey.length > 0 && matches['_number'] !== undefined) {
+      if (numberTypeKey.includes(key)) {
+        if (matches['_number'].includes(target[key])) {
+          match = true;
+          continue;
+        } else {
+          match = false;
+          break;
+
+        }
+      }
+    }
+
   }
 
   //如果在config中所有类型都不符合的情况下，检查 _all
   if (!match && matches['_all'] && Object.keys(matches).length == 1) {
     for (let i = 0; i < matches['_all'].length; i++) {
-      let matchValue = matches['_all'][i];
-      if (typeof matches['_all'][i] === 'string') {
-        matchValue = (matches['_all'][i] as string).toLowerCase()
-      }
       for (let key in target) {
         if (typeof target[key] === 'string') {
-          if (target[key].toLowerCase().includes(matchValue as string)) {
+          if (target[key].includes(matches['_all'][i] as string)) {
             match = true;
             break;
           }
@@ -251,7 +217,8 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
         if (Array.isArray(target[key])) {
           for (let j = 0; j < target[key].length; j++) {
             if (typeof target[key][j] === 'string') {
-              if (target[key][j].toLowerCase().includes(matchValue as string)) {
+              //@ts-ignore
+              if (target[key][j].toLowerCase().includes(matches['_all'][i].toLowerCase() as string)) {
                 match = true;
                 break;
               }
@@ -264,9 +231,6 @@ export function match(matches: FuzzySearchResult, target: any, numberTypeKey: st
 
   return match;
 }
-
-
-
 
 // 以下为数字与范围函数
 export function checkRelationList(num: number, _relationStrList: string[]): boolean {

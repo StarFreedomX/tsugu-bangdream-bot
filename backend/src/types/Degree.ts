@@ -4,8 +4,9 @@ import { downloadFile } from '@/api/downloadFile';
 import { Canvas, Image, loadImage } from 'skia-canvas';
 import mainAPI from '@/types/_Main';
 import { Bestdoriurl } from '@/config';
-import { readJSONFromBuffer } from './utils';
-import { assetsRootPath } from '@/config';
+import { loadImageFromPath } from '@/image/utils';
+import { assetsRootPath } from "@/config";
+import * as path from 'path'
 
 export class Degree {
     degreeId: number;

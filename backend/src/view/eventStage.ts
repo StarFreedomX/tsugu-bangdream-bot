@@ -9,7 +9,7 @@ import { outputFinalBuffer } from '@/image/output'
 import { drawDatablock } from '@/components/dataBlock'
 import { stackImage, stackImageHorizontal } from '@/components/utils'
 
-export async function drawEventStage(eventId: number, mainServer: Server, meta: boolean = false, compress: boolean): Promise<Array<Buffer | string>> {
+export async function drawEventStage(eventId: number, index: number, date: Date, mainServer: Server, meta: boolean = false, compress: boolean): Promise<Array<Buffer | string>> {
     const event = new Event(eventId);
     if (!event.isExist) {
         return [`错误: 活动不存在`];
@@ -20,7 +20,6 @@ export async function drawEventStage(eventId: number, mainServer: Server, meta: 
     if (event.startAt[mainServer] == null) {
         return [`错误: ${serverNameFullList[mainServer]} ID:${eventId} 活动没有时间数据`];
     }
-
     const eventStage = new EventStage(eventId);
     await eventStage.initFull();
     if (!eventStage.isExist) {
@@ -31,8 +30,17 @@ export async function drawEventStage(eventId: number, mainServer: Server, meta: 
     all.push(drawTitle('查试炼', `国服 ID:${eventId} 活动试炼`))
 
     //获得活动stage列表
-    const stageList = eventStage.getStageList();
-
+    var stageList = eventStage.getStageList()
+    if (!date) {
+        date = new Date(stageList[0].startAt + (index - 1) * 24 * 60 * 60 * 1000)
+    }
+    stageList = stageList.filter((stage) => {
+        // console.log((new Date(stage.startAt)))
+        return (new Date(stage.startAt)).getDate() == date.getDate() || (new Date(stage.endAt)).getDate() == date.getDate()
+    })
+    if (stageList.length == 0) {
+        return ['日期' + date.toDateString() + '不在活动范围内']
+    }
     let eventStagePromises = []
 
     //绘制活动stage，每个stage一个图片
