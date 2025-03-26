@@ -36,7 +36,7 @@ export async function drawMedleyDetail(player: playerDetail, server: Server, use
         return ['错误: 活动不存在']
     }
     if (event.eventType != 'medley') {
-        return ['错误：活动序号' + player.currentEvent + '类型不是组曲']
+        return ['错误：活动序号' + player.currentEvent + '类型不是组曲，请使用 组曲计算+活动序号 设置正确的活动']
     }
     let defaultServer: Server = server
     if (!event.startAt[defaultServer]) {
