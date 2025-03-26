@@ -11,15 +11,11 @@ import * as fs from 'fs';
 const errUrl: { [key: string]: number } = {};
 const ERROR_CACHE_EXPIRY = 12 * 60 * 60 * 1000; // 1 天
 
-async function downloadFile(url: string, IgnoreErr: boolean = true, overwrite = false, retryCount = 3): Promise<Buffer> {
+async function downloadFile(url: string, IgnoreErr: boolean = true, overwrite = false, retryCount = 5): Promise<Buffer> {
   try {
     const currentTime = Date.now();
     if(url.includes('undefined')) {
       throw new Error("downloadFile: url.includes('undefined')");
-    }
-
-    if (errUrl[url] && currentTime - errUrl[url] < ERROR_CACHE_EXPIRY) {
-      throw new Error("downloadFile: errUrl includes url and not expired");
     }
 
     const cacheTime = overwrite ? 0 : 1 / 0;
