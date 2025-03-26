@@ -19,7 +19,7 @@ import mainAPI from "@/types/_Main";
 import { AreaItem } from "@/types/AreaItem";
 
 const router = express.Router();
-const playerDB = new PlayerDB(process.env.MONGODB_URI, 'tsugu-bangdream-bot')
+const playerDB = new PlayerDB(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/', 'tsugu-bangdream-bot')
 
 router.post('/',
     [
