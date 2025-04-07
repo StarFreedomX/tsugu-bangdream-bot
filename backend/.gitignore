@@ -3,6 +3,7 @@ dist
 .env
 
 node_modules
+debug.log
 npm-debug.log
 yarn-debug.log
 yarn-error.log
@@ -18,3 +19,4 @@ tsconfig.tsbuildinfo
 *.sln
 cache/*
 logs/*
+src/run_normal.bat
