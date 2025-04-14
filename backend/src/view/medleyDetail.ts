@@ -30,6 +30,7 @@ import { Attribute } from '@/types/Attribute'
 import mainAPI from '@/types/_Main';
 import { Character } from '@/types/Character';
 import { drawRoundedRectWithText } from '@/image/drawRect';
+import { limit } from './calcResult';
 export async function drawMedleyDetail(player: playerDetail, server: Server, useEasyBG: boolean, compress: boolean) {
     const event = new Event(player.currentEvent)
     if (!event.isExist) {
@@ -208,9 +209,9 @@ export async function drawMedleyDetail(player: playerDetail, server: Server, use
             maxWidth: widthMax
         }))
     }
-    else if (cardIconList.length > 31) {
+    else if (cardIconList.length > limit) {
         cardIconListInList.push(drawText({
-            text: '当前卡牌数大于31张，计算时间过长，无法进行组队，请使用 删除卡牌 减少几张卡吧',
+            text: `当前卡牌数大于${limit}张，计算时间过长，无法进行组队，请使用 删除卡牌 减少几张卡吧`,
             maxWidth: widthMax
         }))
     }
