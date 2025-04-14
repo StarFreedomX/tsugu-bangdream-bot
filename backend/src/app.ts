@@ -22,6 +22,7 @@ import { songRandomRouter } from '@/routers/songRandom'
 import { fuzzySearchRouter } from '@/routers/fuzzySearch'
 import { medleyCalRouter } from '@/routers/medleyCal'
 import { topRateDetailRouter } from './routers/topRateDetail';
+import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
 import * as dotenv from 'dotenv';
@@ -53,6 +54,7 @@ app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);
 app.use('/medleyCal', medleyCalRouter);
 app.use('/topRateDetail', topRateDetailRouter);
+app.use('/searchComposition', searchCompositionRouter)
 
 // console.log(process.env)
 if (process.env.LOCAL_DB == 'true') {
