@@ -142,6 +142,38 @@ export class Skill {
         }
     }
 
+    getScoreUp(): scoreUp {
+        const res: scoreUp = { default: 0 }
+        if (this.isExist == false || !this.data['activationEffect']) {
+            return res
+        }
+
+        if (this.data['activationEffect']['unificationActivateEffectValue']) {
+            res.unificationActivateEffectValue = this.data['activationEffect']['unificationActivateEffectValue'] / 100
+            res.unificationActivateConditionBandId = this.data['activationEffect']['unificationActivateConditionBandId']
+            res.unificationActivateConditionType = this.data['activationEffect']['unificationActivateConditionType']
+
+            for (var i in this.data['activationEffect']['activateEffectTypes']) {
+                if (i.startsWith('score'))
+                    this.data['activationEffect']['activateEffectTypes'][i]['activateEffectValue'].forEach(element => {
+                        if (parseInt(element) != null) {
+                            res.default = Math.max(res.default, parseInt(element))
+                        }
+                    });
+
+            }
+        }
+        else res.default = this.getScoreUpMaxValue()
+        res.default /= 100
+        return res
+    }
 
 
+}
+
+export interface scoreUp {
+    default: number,
+    unificationActivateEffectValue?: number,
+    unificationActivateConditionBandId?: number,
+    unificationActivateConditionType?: string
 }

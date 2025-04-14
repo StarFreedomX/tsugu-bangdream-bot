@@ -9,10 +9,6 @@ export async function download(url: string, directory?: string, fileName?: strin
     createDirIfNonExist(directory);
   }
   try {
-    if (errUrl.includes(url)) {
-      throw new Error("downloadFile: errUrl.includes(url)");
-    }
-
     let eTag: string | undefined;
     const cacheFilePath = path.join(directory || '', `${fileName || ''}`);
     if (fileName && directory) {
