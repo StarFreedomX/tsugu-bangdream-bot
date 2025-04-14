@@ -7,6 +7,7 @@ import { Bestdoriurl } from '@/config'
 import { stringToNumberArray } from '@/types/utils'
 import { duration } from 'moment'
 import { Skill } from './Skill'
+import { cardInfo } from '@/view/bruteForce'
 
 export const difficultyName = {//难度名称
     0: "easy",
@@ -364,7 +365,7 @@ export class Chart {
                     for (const duration of durationList) {
                         var tempCombo = combo
                         skill[duration] = 0
-                        for (var j = i + 1; ; j += 1) {
+                        for (var j = i + 1; j < this.nodes.length; j += 1) {
                             if (sgn(this.nodes[j].time - node.time - duration - 1/30) > 0) {
                                 break
                             }
@@ -379,7 +380,7 @@ export class Chart {
                     for (const duration of durationList2) {
                         var tempCombo = combo, skillMod = 200
                         skill[duration] = 0
-                        for (var j = i + 1; ; j += 1) {
+                        for (var j = i + 1; j < this.nodes.length; j += 1) {
                             if (skillMod < 300)
                                 skillMod += 1
                             if (sgn(this.nodes[j].time - node.time - duration - 1/30) > 0) {
@@ -408,7 +409,12 @@ export class Chart {
             return this.meta['100+0.5p'][i][duration]
         return this.meta.skill[i][duration] * scoreUpMaxValue
     }
-    getMaxMetaOrder(list) {
+    getMaxMetaOrder(list: Array<cardInfo> ,scoreUp: Array<number>): {
+        meta: number,
+        team: Array<cardInfo>,
+        capital: cardInfo,
+        scoreUp: Array<number>
+    } {
         const dp = new Array<number>(1 << 5).fill(0), choose = new Array<number>(1 << 5).fill(0)
         dp[0] = this.meta.noSkill
         for (var i = 0; i < 1 << 5; i += 1) {
@@ -417,10 +423,10 @@ export class Chart {
                 if (i >> j & 1)
                     k += 1
             }
-            for (var j = 0; j < 5; j += 1) {
+            for (let j = 0; j < 5; j += 1) {
                 if (i >> j & 1)
                     continue
-                const tmp = dp[i] + this.getSkillMeta(k, list[j].duration, list[j].scoreUpMaxValue, list[j].rateup)
+                const tmp = dp[i] + this.getSkillMeta(k, list[j].duration, scoreUp[j], list[j].rateup)
                 if (tmp > dp[i | 1 << j]) {
                     dp[i | 1 << j] = tmp
                     choose[i | 1 << j] = j
@@ -428,12 +434,13 @@ export class Chart {
             }
         }
 
-        var meta = 0, capital
-        for (var i = 0; i < 5; i++) {
-            const tmp = this.getSkillMeta(5, list[i].duration, list[i].scoreUpMaxValue, list[i].rateup)
+        var meta = 0, capital, capitalScoreUp = 0
+        for (let i = 0; i < 5; i++) {
+            const tmp = this.getSkillMeta(5, list[i].duration, scoreUp[i], list[i].rateup)
             if (tmp > meta) {
                 meta = tmp
                 capital = list[i]
+                capitalScoreUp = scoreUp[i]
             }
         }
         meta += dp[(1 << 5) - 1]
@@ -446,10 +453,10 @@ export class Chart {
         }
         order.reverse()
         const team = order.map(i => list[i])
-        return { meta, team, capital }
+        return { meta, team, capital, scoreUp: [...order.map(i => scoreUp[i]), capitalScoreUp] }
     }
 
-    getScore(cardList, stat) {
+    getScore(cardList: Array<cardInfo>, scoreUp: Array<number>, stat: number): number {
         const base = 3 * stat * (1 + 0.01 * (this.level - 5)) / this.count
         var result = 0, skillCount = 0, combo = this.combo, skillMod = 1, rateup = false
         const event = []
@@ -469,7 +476,7 @@ export class Chart {
                     const startTime = event.at(-1).time + 0.75
                     event.push({
                         time: startTime,
-                        skillMod: 1 + cardList[skillCount].scoreUpMaxValue,
+                        skillMod: 1 + scoreUp[skillCount],
                         rateup: cardList[skillCount].rateup
                     })
                     event.push({
@@ -479,7 +486,7 @@ export class Chart {
                     })
                 }
                 else {
-                    skillMod = 1 + cardList[skillCount].scoreUpMaxValue
+                    skillMod = 1 + scoreUp[skillCount]
                     rateup = cardList[skillCount].rateup
                     event.push({
                         time: node.time + cardList[skillCount].duration + 1/30,

@@ -12,7 +12,6 @@ import { drawMedleyDetail } from "@/view/medleyDetail";
 import { drawCalcResult } from "@/view/calcResult";
 import { Player } from "@/types/Player";
 import { Stat, Card, addStat, emptyStat } from "@/types/Card";
-import Level from "level";
 import { fuzzySearch } from "@/fuzzySearch";
 import { matchCardList } from "@/view/cardList";
 import mainAPI from "@/types/_Main";
@@ -74,14 +73,6 @@ router.post('/importPlayerData',
         })
         await playerDB.addCard(playerId, cardList)
 
-        const areaItemList = player.profile.enabledUserAreaItems.entries.map((item) => {
-            return {
-                id: item.areaItemCategory,
-                level: item.level
-            }
-        })
-        await playerDB.updateAreaItem(playerId, areaItemList)
-
         const characterBounsList = player.profile.mainDeckUserSituations.entries.map((data) => {
             const card = new Card(data.situationId), append = data.userAppendParameter
             const base: Stat = {
@@ -106,6 +97,18 @@ router.post('/importPlayerData',
             }
         })
         await playerDB.updateCharacterBouns(playerId, characterBounsList)
+
+        if (!player.profile.enabledUserAreaItems) {
+            res.send(listToBase64(['无法获取区域道具信息，请公开显示主乐队综合能力']))
+            return
+        }
+        const areaItemList = player.profile.enabledUserAreaItems.entries.map((item) => {
+            return {
+                id: item.areaItemCategory,
+                level: item.level
+            }
+        })
+        await playerDB.updateAreaItem(playerId, areaItemList)
 
         try {
             const result = await commandMedleyDetail(playerId, getServerByServerId(mainServer), useEasyBG, compress);
@@ -273,7 +276,7 @@ router.post('/addCard',
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress, skill_level, break_rank, text } = req.body;
 
-        const cardList = matchCardList(fuzzySearch(text.split(' ')), [3, 0]).map((card) => {
+        const cardList = matchCardList(fuzzySearch(text), [3, 0]).map((card) => {
             return {
                 id : card.cardId,
                 illustTrainingStatus: true,
@@ -304,7 +307,7 @@ router.post('/delCard',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress, text } = req.body;
-        const cardList = matchCardList(fuzzySearch(text.split(' ')), [3, 0]).map((card) => {
+        const cardList = matchCardList(fuzzySearch(text), [3, 0]).map((card) => {
             return card.cardId
         })
         await playerDB.delCard(playerId, cardList)
@@ -327,13 +330,15 @@ router.post('/calcResult',
         body('eventId').optional().isInt(), // eventId is optional and must be an integer if provided
         body('useEasyBG').isBoolean(), // Validation for 'useEasyBG' field
         body('compress').optional().isBoolean(),
+        body('save').optional().isBoolean(),
+        body('description').optional(),
     ],
     middleware,
     async (req: Request, res: Response) => {
-        const { playerId, mainServer, eventId, useEasyBG, compress } = req.body;
+        const { playerId, mainServer, eventId, useEasyBG, compress, save, description } = req.body;
 
         try {
-            const result = await commandCalcResult(playerId, getServerByServerId(mainServer), useEasyBG, compress, eventId);
+            const result = await commandCalcResult(playerId, getServerByServerId(mainServer), useEasyBG, compress, eventId, save, description);
             res.send(listToBase64(result));
         } catch (e) {
             console.log(e);
@@ -343,7 +348,6 @@ router.post('/calcResult',
 );
 
 export async function commandMedleyDetail(playerId: number, mainServer: Server, useEasyBG: boolean, compress: boolean, eventId?: number)/*: Promise<Array<Buffer | string>>*/ {
-
     let player :playerDetail  = await playerDB.getPlayer(playerId)
     var currentEvent = player.currentEvent
     if (eventId) {
@@ -358,7 +362,7 @@ export async function commandMedleyDetail(playerId: number, mainServer: Server, 
     return await drawMedleyDetail(player, mainServer, useEasyBG, compress)
 }
 
-export async function commandCalcResult(playerId: number, mainServer: Server, useEasyBG: boolean, compress: boolean, eventId?: number)/*: Promise<Array<Buffer | string>>*/ {
+export async function commandCalcResult(playerId: number, mainServer: Server, useEasyBG: boolean, compress: boolean, eventId?: number, save?: boolean, description?: string)/*: Promise<Array<Buffer | string>>*/ {
 
     let player :playerDetail  = await playerDB.getPlayer(playerId)
     var currentEvent = player.currentEvent
@@ -371,7 +375,11 @@ export async function commandCalcResult(playerId: number, mainServer: Server, us
     if (currentEvent != player.currentEvent) {
         player = await playerDB.updCurrentEvent(playerId, mainServer, currentEvent)
     }
-    return await drawCalcResult(player, mainServer, useEasyBG, compress)
+
+    if (!save) {
+        save = false
+    }
+    return await drawCalcResult(player, mainServer, useEasyBG, compress, save, description)
 }
 
 export { router as medleyCalRouter }
