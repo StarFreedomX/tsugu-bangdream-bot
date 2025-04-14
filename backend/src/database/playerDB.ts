@@ -1,14 +1,10 @@
 import { MongoClient } from 'mongodb';
-import { globalServerPriority, globalDefaultServer } from '@/config';
 import { Server } from '@/types/Server';
 import mainAPI from '@/types/_Main';
-import { isServer, isServerList } from '@/types/Server';
-import Level from 'level';
 import { Event } from '@/types/Event';
 import { Song } from '@/types/Song';
 import { AreaItem, AreaItemType } from '@/types/AreaItem';
 import { Card, Stat, addStat, emptyStat } from '@/types/Card';
-import { logger } from '@/logger';
 
 export class playerDetail {
   playerId: number
@@ -117,7 +113,11 @@ export class playerDetail {
     const areaItemPercent = [{}, {}, {}]
     for (const areaItemId in this.areaItem) {
       const item = new AreaItem(parseInt(areaItemId))
-      const type = item.getType()
+      try {
+        var type = item.getType()
+      } catch{
+        console.log(parseInt(areaItemId))
+      }
       let id
       switch(type){
         case AreaItemType.band:
@@ -152,7 +152,7 @@ export class playerDetail {
     return areaItemPercent
   }
 }
-export function subStat(stat: Stat, add: Stat): void {//综合力相加函数
+export function subStat(stat: Stat, add: Stat): void {//综合力相减函数
     stat.performance -= add.performance
     stat.technique -= add.technique
     stat.visual -= add.visual
@@ -265,7 +265,7 @@ export class PlayerDB {
   }
 
   async getPlayer(playerId: number): Promise<playerDetail | null> {
-    var data
+    var data: playerDetail
     const res = await this.getCollection().findOne({ _id: playerId })
     if (res == null) {
       data = await this.init(playerId)
