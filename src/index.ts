@@ -58,6 +58,7 @@ export interface Config {
   backendUrl: string,
   RemoteDBSwitch: boolean,
   RemoteDBUrl: string,
+  ycmReply: boolean,
 
   // noSpace: boolean,
   reply: boolean,
@@ -70,6 +71,8 @@ export const Config = Schema.intersect([
     useEasyBG: Schema.boolean().default(false).description('是否使用简易背景, 启用这将大幅提高速度, 关闭将使部分界面效果更美观'),
     compress: Schema.boolean().default(true).description('是否压缩图片, 启用会使图片质量下降, 大幅提高速度, 体积减小从而减少图片传输时所需的时间, 关闭会提高画面清晰度'),
     bandoriStationToken: Schema.string().description('BandoriStationToken, 用于发送车牌, 可以去 https://github.com/maborosh/BandoriStation/wiki/API%E6%8E%A5%E5%8F%A3 申请。缺失情况下, 视为Tsugu车牌'),
+
+    ycmReply: Schema.boolean().default(false).description('回应"ycm"的指令'),
 
     reply: Schema.boolean().default(false).description('消息是否回复用户'),
     at: Schema.boolean().default(false).description('消息是否@用户'),
@@ -247,15 +250,17 @@ export function apply(ctx: Context, config: Config) {
     })
 
   //其他
-  ctx.command('ycm [keyword:text]', '获取车牌', cmdConfig)
-    .alias('有车吗', '车来')
-    .usage(`获取所有车牌车牌, 可以通过关键词过滤`)
-    .example('ycm : 获取所有车牌')
-    .example('ycm 大分: 获取所有车牌, 其中包含"大分"关键词的车牌')
-    .action(async ({ session }, keyword) => {
-      const list = await commandRoomList(config, keyword)
-      return (paresMessageList(list))
-    })
+  if(config.ycmReply){
+    ctx.command('ycm [keyword:text]', '获取车牌', cmdConfig)
+      .alias('有车吗', '车来')
+      .usage(`获取所有车牌车牌, 可以通过关键词过滤`)
+      .example('ycm : 获取所有车牌')
+      .example('ycm 大分: 获取所有车牌, 其中包含"大分"关键词的车牌')
+      .action(async ({session}, keyword) => {
+        const list = await commandRoomList(config, keyword)
+        return (paresMessageList(list))
+      })
+  }
   ctx.command('查玩家 <playerId:integer> [serverName:text]', '查询玩家信息', cmdConfig)
     .alias('查询玩家')
     .usage('查询指定ID玩家的信息。省略服务器名时, 默认从你当前的主服务器查询')
