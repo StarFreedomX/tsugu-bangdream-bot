@@ -28,10 +28,10 @@ router.post(
     middleware,
     async (req: Request, res: Response) => {
         const { mainServer, fuzzySearchResult, text, compress } = req.body;
-        
+
         // 检查 text 和 fuzzySearchResult 是否同时存在
         if (text && fuzzySearchResult) {
-            return res.status(422).json({ status: 'failed', data: 'text 与 fuzzySearchResult 不能同时存在' });
+            res.status(422).json({ status: 'failed', data: 'text 与 fuzzySearchResult 不能同时存在' });
         }
         /*
         // 检查 text 和 fuzzySearchResult 是否同时不存在
