@@ -10,7 +10,7 @@ export const middleware = (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         console.log(`[${timeString}] [Validation Failed] ${req.ip} ${req.baseUrl}${req.path}`, errors.array());
-        return res.status(400).send({ status: 'failed', data: `参数错误`, error: errors.array() });
+        res.status(400).send({ status: 'failed', data: `参数错误`, error: errors.array() });
     }
 
     // 保存原始的 send 方法
