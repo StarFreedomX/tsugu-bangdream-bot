@@ -21,7 +21,7 @@ export const difficultyName = {//难度名称
 export const tagNameList = {
     'normal': '原创曲',
     'anime': '翻唱曲',
-    'tie_up': 'EXTRA歌曲',
+    'extra': 'EXTRA歌曲',
 }
 
 export const difficultyColorList = [ //画难度时使用的配色
@@ -223,7 +223,7 @@ export class Song {
         }
         return tagNameList[this.tag]
     }
-    async getSongChart(difficultyId: number): Promise<any> {
+    async getSongChart(difficultyId: number): Promise<Object> {
         const songChart = await callAPIAndCacheResponse(`${Bestdoriurl}/api/charts/${this.songId}/${difficultyName[difficultyId]}.json`)
         return songChart
     }
