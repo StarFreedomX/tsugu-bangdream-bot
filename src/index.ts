@@ -124,6 +124,8 @@ export function apply(ctx: Context, config: Config) {
       localResult.tsugu.displayedServerList = [3, 0]
       //修复数据库中的displayedServerList为string数组的问题
       localResult.tsugu.displayedServerList = stringArrayToNumberArray(localResult.tsugu.displayedServerList)
+      // 将数组中的所有NaN替换为0，进行数据库的修复，防止发送NaN到后端导致反复出现后端报错
+      localResult.tsugu.displayedServerList = localResult.tsugu.displayedServerList.map(value => isNaN(value) ? 0 : value);
       return localResult.tsugu
     }
     if (config.RemoteDBSwitch) {
