@@ -5,6 +5,7 @@ import { getServerByPriority, Server } from '@/types/Server'
 import mainAPI from '@/types/_Main'
 import { Bestdoriurl } from '@/config'
 import { stringToNumberArray } from '@/types/utils'
+import { assetErrorImageBuffer } from "@/image/utils";
 import { duration } from 'moment'
 import { Skill } from './Skill'
 import { cardInfo } from '@/view/bruteForce'
