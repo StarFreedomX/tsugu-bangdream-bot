@@ -42,6 +42,7 @@ export async function drawSongMetaListDataBlock(Fever: boolean, song: Song, topL
     for (var difficulty in song.difficulty) {
         var difficultyId = parseInt(difficulty)
         var text = ''
+        var note = 0;
         for (let i = 0; i < displayedServerList.length; i++) {
             var tempSongMetaRanking = songMetaRanking[displayedServerList[i]].data
             for (let j = 0; j < tempSongMetaRanking.length; j++) {
@@ -51,7 +52,9 @@ export async function drawSongMetaListDataBlock(Fever: boolean, song: Song, topL
                     text += `${serverNameFullList[displayedServerList[i]]}: ${precent}% #${tempSongMetaRanking[j].rank + 1} `
                 }
             }
+            note ||= songMetaRanking[displayedServerList[i]]?.data[difficultyId]?.notes
         }
+        text += note ? `note数: ${note}` : '';
         list.push(await drawSongInList(song, difficultyId, text))
         list.push(line)
     }

@@ -284,7 +284,8 @@ export interface songInRank {
     songId: number,
     difficulty: number,
     meta: number,
-    rank: number
+    rank: number,
+    notes: number,
 }
 export function getMetaRanking(Fever: boolean, mainServer: Server): songInRank[] {
     var songIdList = Object.keys(mainAPI['meta'])
@@ -308,7 +309,8 @@ export function getMetaRanking(Fever: boolean, mainServer: Server): songInRank[]
                 songId: song.songId,
                 difficulty: difficulty,
                 meta: meta,
-                rank: 0
+                rank: 0,
+                notes: song.notes[difficulty],
             })
         }
     }
