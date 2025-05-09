@@ -362,6 +362,7 @@ export class Chart {
         this.combo = combo
         const durationList = [3, 3.5, 4, 4.5, 5, 5.5, 5.6, 5.7, 6, 6.2, 6.4, 6.5, 6.8, 7, 7.2, 7.5, 8]
         const durationList2 = [5, 5.5, 6, 6.5, 7]
+        this.warning = []
         this.meta = {
             noSkill: 0,
             skill: [],
