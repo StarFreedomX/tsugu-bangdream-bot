@@ -7,7 +7,6 @@ import { calcResult, print } from "./calcResult"
 import { playerDetail } from "@/database/playerDB"
 import { Event } from "@/types/Event"
 import { Skill, scoreUp } from "@/types/Skill"
-import { Result } from "express-validator"
 
 export class cardInfo{
     card: Card
@@ -35,21 +34,19 @@ export class cardInfo{
             technique: add,
             visual: add
         })
-        {
-            const tmpStat = mulStat(this.stat, player.characterBouns[this.card.characterId].potential)
-            addStat(this.stat, {
-                performance: Math.floor(tmpStat.performance),
-                technique: Math.floor(tmpStat.technique),
-                visual: Math.floor(tmpStat.visual)
-            })
-        }
         
         {
-            const tmpStat = mulStat(this.stat, player.characterBouns[this.card.characterId].characterTask)
+            const tmpStat1 = mulStat(this.stat, player.characterBouns[this.card.characterId].potential)
+            const tmpStat2 = mulStat(this.stat, player.characterBouns[this.card.characterId].characterTask)
             addStat(this.stat, {
-                performance: Math.floor(tmpStat.performance),
-                technique: Math.floor(tmpStat.technique),
-                visual: Math.floor(tmpStat.visual)
+                performance: Math.floor(tmpStat1.performance),
+                technique: Math.floor(tmpStat1.technique),
+                visual: Math.floor(tmpStat1.visual)
+            })
+            addStat(this.stat, {
+                performance: Math.floor(tmpStat2.performance),
+                technique: Math.floor(tmpStat2.technique),
+                visual: Math.floor(tmpStat2.visual)
             })
         }
 
@@ -202,8 +199,9 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
                     if (info.scoreUp.unificationActivateEffectValue) {
                         if (info.scoreUp.unificationActivateConditionBandId && info.scoreUp.unificationActivateConditionBandId != bandId)
                             return info.scoreUp.default
-                        if (info.scoreUp.unificationActivateConditionType && info.scoreUp.unificationActivateConditionType != attribute)
+                        if (info.scoreUp.unificationActivateConditionType && info.scoreUp.unificationActivateConditionType.toLocaleLowerCase() != attribute)
                             return info.scoreUp.default
+                        // console.log(info.scoreUp.unificationActivateConditionType, attribute)
                         return info.scoreUp.unificationActivateEffectValue
                     }
                     return info.scoreUp.default
@@ -240,29 +238,24 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
     const teamList: Array<teamInfo> = []
     initTeamList()
     console.log(teamList.length)
-    let time1 = 0, time2 = 0
+    // let time1 = 0, time2 = 0
+    const timeStart = Date.now()
     for (var magazine in areaItem[AreaItemType.magazine]) {
         for (var bandId in areaItem[AreaItemType.band]) {
             for (var attribute in areaItem[AreaItemType.attribute]) {
                 const maxScore = Array.from({ length: charts.length }, () => 0)
-                const st = Date.now()
+                // const st = Date.now()
                 for (const info of list) {
                     info.calcStat(areaItem, bandId, attribute, magazine)
                 }
                 for (const info of teamList) {
                     info.calcStat()
-                    info.score = info.meta.map(meta => meta * Math.floor(info.stat))
-                    info.score.forEach((v, i) => {
-                        if (maxScore[i] < v)
-                            maxScore[i] = v
+                    info.score = charts.map((chart, i) => {
+                        const score = chart.getScore([...info.order[i], info.capital[i]], info.scoreUp[i], Math.floor(info.stat))
+                        if (maxScore[i] < score)
+                            maxScore[i] = score
+                        return score
                     })
-                    // info.calcStat(areaItem, bandId, attribute, magazine)
-                    // info.score = charts.map((chart, i) => {
-                    //     const score = chart.getScore([...info.order[i], info.capital[i]], info.scoreUp[i], Math.floor(info.stat))
-                    //     if (maxScore[i] < score)
-                    //         maxScore[i] = score
-                    //     return score
-                    // })
                 }
                 let abortSet = 0
                 for (let i = 0; i < list.length; i++) {
@@ -284,7 +277,7 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
 
                 const tmpTeamList = teamList.filter(info => (info.set & abortSet) == 0)
                 const ed = Date.now()
-                time1 += ed - st
+                // time1 += ed - st
                 maxScore.push(0)
                 for (var i = charts.length - 1; i >= 0; i -= 1) {
                     maxScore[i] += maxScore[i + 1]
@@ -295,9 +288,16 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
                 // console.log(tmpTeamList.length)
                 var cnt = 0
                 function dfs(depth: number = 0, Set: number = 0, sumScore: number = 0, list: Array<teamInfo> = []) {
+                    if (depth == 1) {
+                        const timeNow = Date.now()
+                        if (timeNow - timeStart > 120000) {
+                            throw new Error()
+                        }
+                    }
                     if (depth == charts.length) {
                         // console.log(sumScore)
                         if (sumScore > data.totalScore) {
+                            cnt += 1
                             const result = {
                                 totalScore: 0,
                                 totalStat: 0,
@@ -310,12 +310,14 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
                             for (var i = 0; i < charts.length; i += 1) {
                                 const info: teamInfo = list[i]
                                 result.totalStat += info.stat
-                                result.score.push(charts[i].getScore([...info.order[i], info.capital[i]], info.scoreUp[i], info.stat))
+                                result.score.push(info.score[i])
                                 result.stat.push(Math.floor(info.stat))
                                 result.team.push(info.order[i])
                                 result.capital.push(info.capital[i])
+                                // console.log(info.scoreUp[i])
                             }
                             result.totalStat = Math.floor(result.totalStat)
+                            result.totalScore = sumScore
                             result.item[AreaItemType.band] = bandId
                             result.item[AreaItemType.attribute] = attribute
                             result.item[AreaItemType.magazine] = magazine
@@ -337,15 +339,16 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
                         }
                     }
                 }
-                const st2 = Date.now()
+                // const st2 = Date.now()
                 dfs()
-                const ed2 = Date.now()
-                time2 += ed2 - st2
+                // console.log(cnt)
+                // const ed2 = Date.now()
+                // time2 += ed2 - st2
             }
         }
     }
-    console.log(time1)
-    console.log(time2)
-    data.totalScore = data.score.reduce((pre, cur) => pre + cur, 0)
+    // console.log(time1)
+    // console.log(time2)
+    // data.totalScore = data.score.reduce((pre, cur) => pre + cur, 0)
     return data
 }
