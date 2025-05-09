@@ -1,5 +1,5 @@
 import { Event } from '@/types/Event';
-import { addStat, Stat, Card, mulStat } from '@/types/Card'
+import { addStat, Stat, Card, mulStat, statSum } from '@/types/Card'
 import { drawList, drawListByServerList, drawListMerge, drawListTextWithImages } from '@/components/list';
 import { drawDottedLine } from '@/image/dottedLine'
 import { drawDatablock } from '@/components/dataBlock'
@@ -21,7 +21,7 @@ import { Skill } from '@/types/Skill';
 import { bruteForce, teamInfo, cardInfo } from './bruteForce';
 import { compositionResultDB } from '@/database/compositionResultDB';
 const resultDB = new compositionResultDB(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/', 'tsugu-bangdream-bot')
-export const limit = 25
+export const limit = 31
 export async function drawCalcResult(player: playerDetail, server: Server, useEasyBG: boolean, compress: boolean, save: boolean, description?: string) {
     const event = new Event(player.currentEvent)
     if (!event.isExist) {
@@ -72,8 +72,14 @@ export async function drawCalcResult(player: playerDetail, server: Server, useEa
     for (const info of cardList) {
         await info.initFull(event, player)
     }
-
-    const data: calcResult = {songList, description, ...bruteForce(charts, cardList, player.getAreaItemPercent(), '')}
+    let calcResult
+    try {
+        calcResult = bruteForce(charts, cardList, player.getAreaItemPercent(), '')
+    }
+    catch(e) {
+        return ['计算超时，尝试减少角色数量']
+    }
+    const data: calcResult = {songList, description, ...calcResult}
     print(data)
     const res: Array<Buffer | string> = await drawResult(data, event, useEasyBG, compress)
     if (save) {
@@ -211,6 +217,7 @@ export function print(res: calcResult) {
     console.log(res.score, res.stat)
     for (var i = 0; i < res.team.length; i += 1) {
         console.log(res.team[i].map((info) => info.card.cardId), res.capital[i].card.cardId)
+        console.log(res.team[i].map(info => statSum(info.stat)), res.team[i].map(info => statSum(info.stat)).reduce((pre, cur) => pre + cur, 0))
     }
     console.log(res.item[0], res.item[1], res.item[2])
     
