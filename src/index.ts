@@ -382,6 +382,7 @@ export function apply(ctx: Context, config: Config) {
       if (text == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查卡`
       }
+      if(text == '947') return '不准查！';
       const tsuguUserData = await observeUserTsugu(session)
       const displayedServerList = tsuguUserData.displayedServerList
       const list = await commandCard(config, displayedServerList, text)
@@ -394,6 +395,7 @@ export function apply(ctx: Context, config: Config) {
       if (cardId == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查卡面`
       }
+      if(cardId == 947) return '不准查！';
       const list = await commandGetCardIllustration(config, cardId)
       return paresMessageList(list)
     })
