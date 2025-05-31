@@ -107,6 +107,17 @@ export function matchSongList(matches: FuzzySearchResult, displayedServerList: S
     var songIdList: Array<number> = Object.keys(mainAPI['songs']).map(Number)
     for (let i = 0; i < songIdList.length; i++) {
         const tempSong = new Song(songIdList[i]);
+        for (let s of tempSong.musicTitle) {
+            if (s && (s.toLowerCase().replace(/[!?]/g, '') == (matches['_all'][0] as string) || s.toLowerCase() == (matches['_all'][0] as string))) {
+                tempSongList.push(tempSong)
+                break
+            }
+        }
+    }
+    if (tempSongList.length > 0)
+        return tempSongList
+    for (let i = 0; i < songIdList.length; i++) {
+        const tempSong = new Song(songIdList[i]);
         var isMatch = match(matches, tempSong, []);
         //如果在所有所选服务器列表中都不存在，则不输出
         var numberOfNotReleasedServer = 0;

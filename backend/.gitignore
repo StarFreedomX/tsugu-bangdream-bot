@@ -19,4 +19,4 @@ tsconfig.tsbuildinfo
 *.sln
 cache/*
 logs/*
-src/run_normal.bat
+run_normal.bat

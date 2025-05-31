@@ -55,12 +55,11 @@ async function commandCard(displayedServerList: Server[], input: string | FuzzyS
         // 使用 fuzzySearch 逻辑
         fuzzySearchResult = input
     }
-
     if (Object.keys(fuzzySearchResult).length == 0) {
         return ['错误: 没有有效的关键词']
     }
 
-    return await drawCardList(fuzzySearchResult, displayedServerList, compress)
+    return await drawCardList(fuzzySearchResult, displayedServerList, useEasyBG, compress)
 
 }
 
