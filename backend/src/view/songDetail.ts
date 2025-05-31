@@ -1,5 +1,5 @@
 import { getPresentEvent } from '@/types/Event';
-import { drawList, line, drawListByServerList, drawListMerge } from '@/components/list';
+import { drawList, line, drawListByServerList, drawListMerge, drawListTextWithImages } from '@/components/list';
 import { drawDatablock } from '@/components/dataBlock'
 import { Image, Canvas } from 'skia-canvas'
 import { drawTimeInList } from '@/components/list/time';
@@ -13,6 +13,7 @@ import { drawEventDatablock } from '@/components/dataBlock/event';
 import { drawSongMetaListDataBlock } from '@/components/dataBlock/songMetaList'
 import { globalDefaultServer, serverNameFullList } from '@/config';
 import { formatSeconds } from '@/components/list/time'
+import { drawDifficulityListWithNotes } from '@/components/list/difficulty';
 
 export async function drawSongDetail(song: Song, displayedServerList: Server[] = globalDefaultServer, compress: boolean): Promise<Array<Buffer | string>> {
     if (song.isExist == false) {
@@ -22,6 +23,11 @@ export async function drawSongDetail(song: Song, displayedServerList: Server[] =
     var list: Array<Image | Canvas> = []
     //标题
     list.push(await drawListByServerList(song.musicTitle, '歌曲名称'))
+    list.push(line)
+
+    //乐队
+    var band = new Band(song.bandId)
+    list.push(await drawListByServerList(band.bandName, '乐队', displayedServerList))
     list.push(line)
 
     //歌曲tag(类型)
@@ -35,26 +41,11 @@ export async function drawSongDetail(song: Song, displayedServerList: Server[] =
     list.push(drawListMerge([typeImage, IdImage]))
     list.push(line)
 
-    //乐队
-    var band = new Band(song.bandId)
-    list.push(await drawListByServerList(band.bandName, '乐队', displayedServerList))
-    list.push(line)
-
-    //作词
-    list.push(await drawListByServerList(song.detail.lyricist, '作词', displayedServerList))
-    list.push(line)
-    //作曲
-    list.push(await drawListByServerList(song.detail.composer, '作曲', displayedServerList))
-    list.push(line)
-    //编曲
-    list.push(await drawListByServerList(song.detail.arranger, '编曲', displayedServerList))
-    list.push(line)
     //时长
-    list.push(drawList({
+    let timeImage = drawList({
         key: '时长',
         text: formatSeconds(song.length)
-    }))
-    list.push(line)
+    })
     //bpm
     var bpmList: number[] = []
     for (let difficulty in song.bpm) {
@@ -72,10 +63,26 @@ export async function drawSongDetail(song: Song, displayedServerList: Server[] =
     else {
         bpm = `${bpmMin} ~ ${bpmMax}`
     }
-    list.push(drawList({
+    let bpmImage = drawList({
         key: 'bpm',
         text: bpm
+    })
+    list.push(drawListMerge([timeImage, bpmImage]))
+    list.push(line)
+    //notes
+    list.push(drawListTextWithImages({
+        key: 'notes',
+        content: [drawDifficulityListWithNotes(song)],
     }))
+    list.push(line)
+    //作词
+    list.push(await drawListByServerList(song.detail.lyricist, '作词', displayedServerList))
+    list.push(line)
+    //作曲
+    list.push(await drawListByServerList(song.detail.composer, '作曲', displayedServerList))
+    list.push(line)
+    //编曲
+    list.push(await drawListByServerList(song.detail.arranger, '编曲', displayedServerList))
     list.push(line)
 
     //发布时间
