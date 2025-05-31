@@ -10,3 +10,10 @@ export async function commandSongChart(config: Config, displayedServerList: Serv
         difficultyId
     })
 }
+
+export async function commandCommunitySongChart(config: Config, songId: number): Promise<Array<Buffer | string>> {
+    return await getReplyFromBackend(`${config.backendUrl}/songChart/community`, {
+        songId,
+        compress: config.compress
+    })
+}
