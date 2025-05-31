@@ -8,6 +8,7 @@ import { stringToNumberArray } from '@/types/utils'
 import { duration } from 'moment'
 import { Skill } from './Skill'
 import { cardInfo } from '@/view/bruteForce'
+import { assetErrorImageBuffer } from "@/image/utils";
 
 export const difficultyName = {//难度名称
     0: "easy",
@@ -20,7 +21,7 @@ export const difficultyName = {//难度名称
 export const tagNameList = {
     'normal': '原创曲',
     'anime': '翻唱曲',
-    'extra': 'EXTRA歌曲',
+    'tie_up': 'EXTRA歌曲',
 }
 
 export const difficultyColorList = [ //画难度时使用的配色
@@ -191,18 +192,29 @@ export class Song {
     async getSongJacketImage(displayedServerList: Server[] = [Server.jp, Server.cn]): Promise<Image> {
         const jacketImageUrl = this.getSongJacketImageURL(displayedServerList)
         var jacketImageBuffer = await downloadFile(jacketImageUrl)
+        //下载失败自动尝试切换服务器下载
+        if (jacketImageBuffer.equals(assetErrorImageBuffer)) {
+            console.log("download failed, try to download jacket from other servers")
+          const servers = ['jp', 'cn', 'en', 'tw', 'kr'];
+          var jacketImageName = this.jacketImage[this.jacketImage.length - 1];
+          for (const server of servers) {
+            const retryUrl = `${Bestdoriurl}/assets/${server}/musicjacket/musicjacket${this.getSongRip()}_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket${this.getSongRip()}-${jacketImageName}-jacket.png`;
+            jacketImageBuffer = await downloadFile(retryUrl, true, false, 1);
+            if (!jacketImageBuffer.equals(assetErrorImageBuffer)) break;
+          }
+        }
         return await loadImage(jacketImageBuffer)
     }
     getSongJacketImageURL(displayedServerList?: Server[]): string {
         var server = getServerByPriority(this.publishedAt, displayedServerList)
         var jacketImageName = this.jacketImage[this.jacketImage.length - 1]
-        if (this.songId == 13) {
-            return `${Bestdoriurl}/assets/cn/musicjacket/musicjacket30_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket30-miracle-jacket.png`;
+        var songRip = this.getSongRip();
+        if (this.songId == 13 || this.songId == 40) {
+            songRip = 30;
+        } else if(this.songId == 273) { //针对273的修复
+            server = Server.cn;
         }
-        if (this.songId == 40) {
-            return `${Bestdoriurl}/assets/cn/musicjacket/musicjacket30_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket30-kirayume-jacket.png`;
-        }
-        var jacketImageUrl = `${Bestdoriurl}/assets/${Server[server]}/musicjacket/musicjacket${this.getSongRip()}_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket${this.getSongRip()}-${jacketImageName.toLowerCase()}-jacket.png`
+        var jacketImageUrl = `${Bestdoriurl}/assets/${Server[server]}/musicjacket/musicjacket${songRip}_rip/assets-star-forassetbundle-startapp-musicjacket-musicjacket${songRip}-${jacketImageName.toLowerCase()}-jacket.png`
         return jacketImageUrl
     }
     getTagName(): string {
@@ -223,8 +235,8 @@ export class Song {
     返回[ 1.7464, 2.1164, 2.0527, 2.789 ]
     协力带fever，只看2.0527, 2.789
     如果技能是115%的话总百分比为2.0527 + 215% * 2.789
- 
-    上面那个算出来之后，最后再乘准确度加成1.1 * P% + 0.8 * (1 - P%) 
+
+    上面那个算出来之后，最后再乘准确度加成1.1 * P% + 0.8 * (1 - P%)
     得到的就和站上meta的数字一样了
     然后乘上队伍综合力就行
     */
