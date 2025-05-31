@@ -1,6 +1,7 @@
 import { Card } from "@/types/Card";
 import { Character } from "@/types/Character";
 import mainAPI from "@/types/_Main"
+import { drawCardDetail } from '@/view/cardDetail';
 import { match, checkRelationList, FuzzySearchResult } from "@/fuzzySearch"
 import { Canvas } from 'skia-canvas'
 import { drawCardIcon } from "@/components/card"
@@ -13,13 +14,16 @@ import { globalDefaultServer } from '@/config';
 
 const maxWidth = 7000
 
-export async function drawCardList(matches: FuzzySearchResult, displayedServerList: Server[] = globalDefaultServer, compress: boolean): Promise<Array<Buffer | string>> {
+export async function drawCardList(matches: FuzzySearchResult, displayedServerList: Server[] = globalDefaultServer, useEasyBG: boolean, compress: boolean): Promise<Array<Buffer | string>> {
 
     //计算模糊搜索结果
     const tempCardList: Array<Card> = matchCardList(matches, displayedServerList);
 
     if (tempCardList.length == 0) {
         return ['没有搜索到符合条件的卡牌']
+    }
+    if (tempCardList.length == 1) {
+        return await drawCardDetail(tempCardList[0].cardId, displayedServerList, useEasyBG, compress)
     }
 
     //计算表格，X轴为颜色，Y轴为角色
@@ -159,7 +163,6 @@ export function matchCardList(matches: FuzzySearchResult, displayedServerList: S
             continue;
         }
         var isMatch = match(matches, tempCard, ['scoreUpMaxValue']);
-        //console.log(tempCard.cardId, 1, isMatch)
         //如果在所有所选服务器列表中都不存在，则不输出
         var numberOfReleasedServer = 0;
         for (var j = 0; j < displayedServerList.length; j++) {
@@ -171,14 +174,7 @@ export function matchCardList(matches: FuzzySearchResult, displayedServerList: S
         if (numberOfReleasedServer == 0) {
             isMatch = false;
         }
-        //console.log(tempCard.cardId, 2, isMatch)
 
-        if (matches._number != undefined) {
-            //如果之后范围的话则直接判断
-            if (isMatch || Object.keys(matches).length == 1) {
-                isMatch = matches._number.includes(tempCard.cardId)
-            }
-        }
         //如果有数字关系词，则判断关系词
 
         if (matches._relationStr != undefined) {
@@ -187,7 +183,6 @@ export function matchCardList(matches: FuzzySearchResult, displayedServerList: S
                 isMatch = checkRelationList(tempCard.cardId, matches._relationStr as string[])
             }
         }
-        //console.log(tempCard.cardId, 3, isMatch)
 
         if (isMatch) {
             tempCardList.push(tempCard);

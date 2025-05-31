@@ -14,6 +14,24 @@ export function drawDifficulityList(song: Song, imageHeight: number = 60, spacin
     return canvas
 }
 
+export function drawDifficulityListWithNotes(song: Song, imageHeight: number = 60, maxWidth = 800): Canvas {
+    var difficultyCount = Object.keys(song.difficulty).length
+    var canvas = new Canvas(maxWidth, imageHeight * 2)
+    let spacing = (maxWidth - difficultyCount * imageHeight) / difficultyCount
+    var ctx = canvas.getContext("2d")
+    for (var d in song.difficulty) {
+        let i = parseInt(d)
+        ctx.drawImage(drawDifficulity(i, song.difficulty[i].playLevel, imageHeight), i * (imageHeight + spacing) + imageHeight / 2, 0)
+        let notesText = drawText({
+            textSize: imageHeight / 3 * 2,
+            text: song.notes[i].toString(),
+            maxWidth: imageHeight * 3
+        })
+        ctx.drawImage(notesText, i * (imageHeight + spacing) + imageHeight - notesText.width / 2, imageHeight * 7 / 6)
+    }
+    return canvas
+}
+
 export function drawDifficulityListWithDiff(song: Song, difficulty: number, imageHeight: number = 60, spacing: number = 10): Canvas {
     var difficultyCount = Object.keys(song.difficulty).length
     var canvas = new Canvas(imageHeight * difficultyCount + (difficultyCount - 1) * spacing, imageHeight)
