@@ -14,15 +14,17 @@ import { commandSongMeta } from './commands/songMeta'
 import { roomNumber } from './commands/roomNumber'
 import { commandRoomList } from './commands/roomList'
 import { commandBindPlayer, commandPlayerInfo, commandSwitchDisplayedServerList, commandSwitchServerMode, commandUnbindPlayer, commandSwitchShareRoomNumberMode, commandPlayerList, commandSwitchPlayerIndex } from './commands/user'
-import { commandSongChart } from './commands/songChart'
+import { commandSongChart, commandCommunitySongChart } from './commands/songChart'
 import { commandEventStage } from './commands/eventStage'
 import { commandSongRandom } from './commands/songRandom'
+import { commandTopRateDetail } from './commands/topRateDetail'
 import { Server } from './types/Server'
 import { globalDefaultServer, tsuguUser } from './config'
 import { tierListOfServerToString, checkLeftDigits, paresMessageList, stringArrayToNumberArray } from './utils'
 import { getRemoteDBUserData } from './api/remoteDB'
 import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySearch'
-
+import {} from 'koishi-plugin-adapter-onebot'
+import { Player } from './types/Player'
 
 export const name = 'tsugu-bangdream-bot';
 export const inject = ['database'];
@@ -57,7 +59,7 @@ export interface Config {
   RemoteDBSwitch: boolean,
   RemoteDBUrl: string,
 
-  //noSpace: boolean,
+  // noSpace: boolean,
   reply: boolean,
   at: boolean,
 }
@@ -71,7 +73,7 @@ export const Config = Schema.intersect([
 
     reply: Schema.boolean().default(false).description('消息是否回复用户'),
     at: Schema.boolean().default(false).description('消息是否@用户'),
-    //noSpace: Schema.boolean().default(false).description('是否启用无需空格触发大部分指令, 启用这将方便一些用户使用习惯, 但会增加bot误判概率, 仍然建议使用空格'),
+    // noSpace: Schema.boolean().default(false).description('是否启用无需空格触发大部分指令, 启用这将方便一些用户使用习惯, 但会增加bot误判概率, 仍然建议使用空格'),
 
     backendUrl: Schema.string().required(false).default('http://tsugubot.com:8080').description('后端服务器地址, 用于处理指令。如果有自建服务器, 可以改成自建服务器地址。默认为Tsugu公共后端服务器。如果你在本机部署后端, 请写 "http://127.0.0.1:3000"'),
     RemoteDBSwitch: Schema.boolean().default(false).description('是否使用独立后端的数据库。启用后, 所有用户数据与车牌数据将使用远程数据库而不是koishi数据库'),
@@ -114,6 +116,9 @@ export function apply(ctx: Context, config: Config) {
   async function observeUserTsugu(session: Session): Promise<tsuguUser> {
     async function getLocalUserData(session: Session): Promise<tsuguUser> {
       const localResult = await session.observeUser(['tsugu'])
+      localResult.tsugu.platform = session.platform
+      localResult.tsugu.userId = session.userId
+      localResult.tsugu.displayedServerList = [3, 0]
       //修复数据库中的displayedServerList为string数组的问题
       localResult.tsugu.displayedServerList = stringArrayToNumberArray(localResult.tsugu.displayedServerList)
       return localResult.tsugu
@@ -147,101 +152,6 @@ export function apply(ctx: Context, config: Config) {
       return next();
     }
   })
-  /*
-  // 使得打指令不需要加空格
-  ctx.middleware((session, next) => {
-    if (config.noSpace) {
-      // 查卡面 一定要放在 查卡 前面
-      const keywords = ['查询玩家', '查卡面', '查玩家', '查卡', '查角色', '查活动', '查分数表', '查询分数榜', '查分数榜', '查曲', '查谱面', , '查卡池', '查询分数表', 'ycx', 'ycxall', 'lsycx', '抽卡模拟', '绑定玩家', '解除绑定', '主服务器', '设置默认服务器', '玩家状态', '开启车牌转发', '关闭车牌转发'];
-      // 检查会话内容是否以列表中的任何一个词语开头
-      const keyword = keywords.find(keyword => session.content.startsWith(keyword));
-
-      if (keyword) {
-        if (session.content[keyword.length] === ' ') {
-          return next();
-        } else {
-          const content_cut = session.content.slice(keyword.length);
-          return session.execute(`${keyword} ${content_cut}`, next);
-        }
-      }
-      else {
-        return next();
-      }
-    }
-    else {
-      return next();
-    }
-  });
-  */
-  //群相关
-  /*
-  ctx.command("抽卡 <word:text>", '开关群聊抽卡功能').usage('开关群聊抽卡功能, 需要管理员权限')
-    .example('开启抽卡 :开启群聊抽卡功能').example('关闭抽卡 :关闭群聊抽卡功能')
-    .shortcut('开启抽卡', { args: ['on'] })
-    .shortcut('关闭抽卡', { args: ['off'] })
-    .channelFields(["tsugu_gacha"])
-    .userFields(['authority'])
-    .action(async ({ session }, text) => {
-      // 获取 session.event.member.roles 和 session.author.roles
-      const eventMemberRoles = session.event.member.roles || [];
-      const authorRoles = session.author.roles || [];
-      // 合并两个角色列表并去重
-      const roles = Array.from(new Set([...eventMemberRoles, ...authorRoles]));
-      // 检查是否有所需角色
-      const hasRequiredRole = roles.includes('admin') || roles.includes('owner');
-      // 检查用户是否有足够的权限：authority > 1 或者角色是 admin 或 owner
-      if (session.user.authority > 1 || hasRequiredRole) {
-        switch (text) {
-          case "on":
-          case "开启":
-            session.channel.tsugu_gacha = true;
-            return "开启成功";
-          case "off":
-          case "关闭":
-            session.channel.tsugu_gacha = false;
-            return "关闭成功";
-          default:
-            return "无效指令";
-        }
-      } else {
-        return "您没有权限执行此操作";
-      }
-    })
-  ctx.command("tsugu_swc <word:text>", '开关本频道tsugu')
-    .usage('[试验性功能]\n发送tsugu_swc查看当前开关状态\n使用tsugu_swc on @tsugu 开启tsugu, 使用tsugu_swc off @tsugu 关闭tsugu, 试验性功能需要管理员权限')
-    .channelFields(["tsugu_run"])
-    .userFields(['authority'])
-    .action(async ({ session }, text) => {
-      if (session.event.message.content == 'tsugu_swc') {
-        return `当前tsugu运行状态为 ${session.channel.tsugu_run}`
-      }
-      // 获取 session.event.member.roles 和 session.author.roles
-      const eventMemberRoles = session?.event?.member?.roles || [];
-      const authorRoles = session?.author?.roles || [];
-      // 合并两个角色列表并去重
-      const roles = Array.from(new Set([...eventMemberRoles, ...authorRoles]));
-
-      // 检查是否有所需角色
-      const hasRequiredRole = roles.includes('admin') || roles.includes('owner');
-
-      // 检查用户是否有足够的权限：authority > 1 或者角色是 admin 或 owner
-      if (session.user.authority > 1 || hasRequiredRole) {
-        if (session.content.includes('on') && session.content.includes(session.selfId)) {
-          session.channel.tsugu_run = true;
-          return '开启成功';
-        }
-        else if (session.content.includes('off') && session.content.includes(session.selfId)) {
-          session.channel.tsugu_run = false;
-          return '关闭成功';
-        } else {
-          return '无效指令';
-        }
-      } else {
-        return '您没有权限执行此操作';
-      }
-    })
-    */
-  //玩家相关
   ctx.command('开启车牌转发', '开启车牌转发', cmdConfig)
     .userFields(['tsugu'])
     .action(async ({ session }) => {
@@ -367,6 +277,37 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSearchPlayer(config, playerId, mainServer)
       return (paresMessageList(list))
     })
+  ctx.command('查岗 <playerId:string> [serverName:string]', '查询前十车速', cmdConfig)
+    .option('count', '-c <count:number> 指定显示最近的几次分数变化，默认20次')
+    .action(async ({ session, options }, playerId, serverName) => {
+      if (playerId == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
+      }
+      var tier
+      if (isNaN(parseInt(playerId))) {
+        if (playerId[0] == 't' && !isNaN(parseInt(playerId.slice(1)))) {
+          tier = parseInt(playerId.slice(1))
+          playerId = undefined
+        }
+        else {
+          return `请确认输入玩家id或者排名格式正确`
+        }
+        if (tier > 10 || tier < 1) {
+          return `请确认输入的排名在1到10之间`
+        }
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      const list = await commandTopRateDetail(config, options.count, playerId, tier, mainServer)
+      return (paresMessageList(list))
+    })
   ctx.command("查卡 <word:text>", "查卡", cmdConfig)
     .alias('查卡牌')
     .usage('根据关键词或卡牌ID查询卡片信息, 请使用空格隔开所有参数')
@@ -382,12 +323,13 @@ export function apply(ctx: Context, config: Config) {
     })
   ctx.command('查卡面 <cardId:integer>', '查卡面', cmdConfig)
     .alias('查卡插画', '查插画')
+    .option('trim', '-t <trim:boolean>')
     .usage('根据卡片ID查询卡片插画').example('查卡面 1399 :返回1399号卡牌的插画')
-    .action(async ({ session }, cardId) => {
+    .action(async ({ session, options }, cardId) => {
       if (cardId == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查卡面`
       }
-      const list = await commandGetCardIllustration(config, cardId)
+      const list = await commandGetCardIllustration(config, cardId, options.trim)
       return paresMessageList(list)
     })
   ctx.command('查角色 <word:text>', '查角色', cmdConfig)
@@ -447,6 +389,16 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSongChart(config, displayedServerList, songId, difficultyId)
       return paresMessageList(list)
     })
+  ctx.command("查自制谱 <songId:integer>", "查自制谱", cmdConfig)
+    .usage('根据ID查询自制谱信息')
+    .example('查谱面 1 :返回1号曲的铺面')
+    .action(async ({ session }, songId) => {
+      if (songId == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查自制谱`
+      }
+      const list = await commandCommunitySongChart(config, songId)
+      return paresMessageList(list)
+    })
   ctx.command("随机曲 [word:text]", "随机曲", cmdConfig)
     .usage('根据关键词或曲目ID查询曲目信息')
     .alias('随机')
@@ -476,17 +428,28 @@ export function apply(ctx: Context, config: Config) {
 
     })
 
-  ctx.command("查试炼 [eventId:integer]", "查试炼", cmdConfig)
-    .usage('查询当前服务器当前活动试炼信息\n可以自定义活动ID\n参数:-m 显示歌曲meta(相对效率)')
+  ctx.command("查试炼 [origin:string] [index:number]", "查试炼", cmdConfig)
+    .usage('查询当前服务器当前活动试炼信息\n可以自定义活动ID和日期')
     .alias('查stage', '查舞台', '查festival', '查5v5')
-    .example('查试炼 157 -m :返回157号活动的试炼信息, 包含歌曲meta')
-    .example('查试炼 -m :返回当前活动的试炼信息, 包含歌曲meta')
-    .example('查试炼 :返回当前活动的试炼信息')
-    .option('meta', '-m')
-    .action(async ({ session, options }, eventId) => {
+    .example('查试炼 2024.12.25 :返回2024.12.25对应活动的试炼信息, 包含歌曲meta')
+    .example('查试炼 12.25 :返回当年12.25对应活动的试炼信息, 包含歌曲meta')
+    .example('查试炼 261:返回261号活动第一天的试炼信息, 包含歌曲meta')
+    .example('查试炼 261 7:返回261号活动第七天的试炼信息, 包含歌曲meta')
+    .action(async ({ session, options }, origin, index) => {
+      function parseDate(origin) {
+        const list = origin?.match(/\d+/gim)
+        if (!list || list.length == 0) 
+          return {}
+        if (list.length == 1 && parseInt(list[0]) > 31) {
+          return { eventId: parseInt(list[0]) }
+        }
+        const now = new Date()
+        return { date: new Date(list.at(-3) ?? now.getFullYear(), (list.at(-2) ?? now.getMonth() + 1) - 1, list.at(-1))}
+      }
+      const { eventId, date } = parseDate(origin)
       const tsuguUserData = await observeUserTsugu(session)
       const mainServer = tsuguUserData.mainServer
-      const list = await commandEventStage(config, mainServer, eventId, options.meta,)
+      const list = await commandEventStage(config, mainServer, eventId, index, date, true)
       return paresMessageList(list)
     })
 
@@ -502,13 +465,18 @@ export function apply(ctx: Context, config: Config) {
       return paresMessageList(list)
     })
 
-  ctx.command("ycx <tier:integer> [eventId:integer] [serverName]", "查询指定档位的预测线", cmdConfig)
+  ctx.command("ycx <tier:integer> [eventId] [serverName]", "查询指定档位的预测线", cmdConfig)
     .usage(`查询指定档位的预测线, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有活动ID的话, 活动为当前活动\n可用档线:\n:\n${tierListOfServerToString()}`)
     .example('ycx 1000 :返回默认服务器当前活动1000档位的档线与预测线').example('ycx 1000 177 jp:返回日服177号活动1000档位的档线与预测线')
     .action(async ({ session }, tier, eventId, serverName) => {
       if (tier == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help ycx`
       }
+      // @ts-ignore
+      if(isNaN(eventId)) {
+        serverName = eventId;
+        eventId = undefined;
+      }
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -518,14 +486,20 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
+      // @ts-ignore
       const list = await commandCutoffDetail(config, mainServer, tier, eventId)
       return paresMessageList(list)
     })
-  ctx.command("ycxall [eventId:integer] [serverName]", "查询所有档位的预测线", cmdConfig)
+  ctx.command("ycxall [eventId] [serverName]", "查询所有档位的预测线", cmdConfig)
     .usage(`查询所有档位的预测线, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有活动ID的话, 活动为当前活动\n可用档线:\n${tierListOfServerToString()}`)
     .example('ycxall :返回默认服务器当前活动所有档位的档线与预测线').example('ycxall 177 jp:返回日服177号活动所有档位的档线与预测线')
     .alias('myycx')
     .action(async ({ session }, eventId, serverName) => {
+      // @ts-ignore
+      if(isNaN(eventId)) {
+        serverName = eventId;
+        eventId = undefined;
+      }
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -535,16 +509,22 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
+      // @ts-ignore
       const list = await commandCutoffAll(config, mainServer, eventId)
       return paresMessageList(list)
     })
-  ctx.command("lsycx <tier:integer> [eventId:integer] [serverName]", "查询指定档位的预测线", cmdConfig)
+  ctx.command("lsycx <tier:integer> [eventId] [serverName]", "查询指定档位的预测线", cmdConfig)
     .usage(`查询指定档位的预测线, 与最近的4期活动类型相同的活动的档线数据, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有活动ID的话, 活动为当前活动\n可用档线:\n${tierListOfServerToString()}`)
     .example('lsycx 1000 :返回默认服务器当前活动的档线与预测线, 与最近的4期活动类型相同的活动的档线数据').example('lsycx 1000 177 jp:返回日服177号活动1000档位档线与最近的4期活动类型相同的活动的档线数据')
     .action(async ({ session }, tier, eventId, serverName) => {
       if (tier == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help lsycx`
       }
+      // @ts-ignore
+      if(isNaN(eventId)) {
+        serverName = eventId;
+        eventId = undefined;
+      }
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -554,6 +534,7 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
+      // @ts-ignore
       const list = await commandCutoffListOfRecentEvent(config, mainServer, tier, eventId)
       return paresMessageList(list)
     })

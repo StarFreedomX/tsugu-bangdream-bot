@@ -3,8 +3,8 @@ import { Player } from "./Player";
 import { unescape } from "querystring";
 import { getServerByName } from "./Server";
 import * as axios from 'axios'
-
-
+import { Logger } from "koishi";
+const logger = new Logger('submitRoomNumber')
 //栈函数
 class Stack<T> {
     stack: T[];
@@ -206,6 +206,7 @@ export async function submitRoomNumber({ number, rawMessage, source, userId, tim
             source: 'Tsugu',
             token: bandoriStationToken
         }
+        logger.info(data)
         try {
             await axios.default.post(url, data)
         } catch (e) {
