@@ -29,6 +29,14 @@ function extractNoteNumber(str: string): number | null {
   }
   return null;
 }
+function extractSkillNumber(str: string): number | null {
+  const regex = /^(?:sk|skill)(\d+)$/i;
+  const match = str.match(regex);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+}
 
 export let config: FuzzySearchConfig = loadConfig();
 
@@ -95,6 +103,14 @@ export function fuzzySearch(keyword: string): FuzzySearchResult {
         matches['notes'] = [];
       }
       matches['notes'].push(noteNumber);
+      continue;
+    }
+    const skillNumber = extractSkillNumber(keyword);
+    if (skillNumber !== null) {
+      if (!matches['scoreUpMaxValue']) {
+        matches['scoreUpMaxValue'] = [];
+      }
+      matches['scoreUpMaxValue'].push(skillNumber);
       continue;
     }
 
@@ -166,7 +182,7 @@ function isValidRelationStr(_relationStr: string): boolean {
 }
 export function include(source: string, target: string) {
   source = source.toLowerCase()
-  return source.includes(target) && (!/^[A-Za-z0-9]+$/.test(target) || target.length > 1) || source == target
+  return source.includes(target) && (!/^[A-Za-z0-9]+$/.test(target) || target.length > 3) || source.split(' ').includes(target)
 }
 export function match(matches: FuzzySearchResult, target: any, numberTypeKey: string[]): boolean {
   if (!target) {
