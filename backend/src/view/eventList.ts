@@ -40,7 +40,7 @@ export async function drawEventList(matches: FuzzySearchResult, displayedServerL
     var eventIdList: Array<number> = Object.keys(mainAPI['events']).map(Number);//所有活动ID列表
     for (let i = 0; i < eventIdList.length; i++) {
         const tempEvent = new Event(eventIdList[i]);
-        var isMatch = match(matches, tempEvent, []);
+        var isMatch = match(matches, tempEvent, ['eventId']);
         // 如果在所有所选服务器列表中都不存在，则不输出
         var numberOfNotReleasedServer = 0;
         for (var j = 0; j < displayedServerList.length; j++) {
@@ -53,12 +53,6 @@ export async function drawEventList(matches: FuzzySearchResult, displayedServerL
             isMatch = false;
         }
 
-        
-        if (matches._number != undefined) {
-            if (isMatch || Object.keys(matches).length == 1) {
-                isMatch = matches._number.includes(tempEvent.eventId)
-            }
-        }
         //如果有数字关系词，则判断关系词
         if (matches._relationStr != undefined) {
             //如果之后范围的话则直接判断

@@ -162,7 +162,7 @@ export function matchCardList(matches: FuzzySearchResult, displayedServerList: S
         if (tempCard.type == 'others') {
             continue;
         }
-        var isMatch = match(matches, tempCard, ['scoreUpMaxValue']);
+        var isMatch = match(matches, tempCard, ['cardId']);
         //如果在所有所选服务器列表中都不存在，则不输出
         var numberOfReleasedServer = 0;
         for (var j = 0; j < displayedServerList.length; j++) {
