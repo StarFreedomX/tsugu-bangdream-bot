@@ -48,6 +48,7 @@ declare module 'koishi' {
   interface Channel {
     tsugu_gacha: boolean,
     tsugu_run: boolean,
+    tsugu_shareRoom: boolean,
   }
 }
 
@@ -113,6 +114,7 @@ export function apply(ctx: Context, config: Config) {
     {
       tsugu_gacha: { type: 'boolean', initial: true },
       tsugu_run: { type: 'boolean', initial: true },
+      tsugu_shareRoom: { type: 'boolean', initial: false },
     })
 
   //获取用户数据函数
@@ -146,12 +148,13 @@ export function apply(ctx: Context, config: Config) {
   }
 
   //判断是否为车牌
-  ctx.middleware(async (session, next) => {
+  ctx.middleware(async (session: Session, next) => {
     const number = checkLeftDigits(session.content)
     if (number != 0) {
       await session.observeUser(['tsugu'])
+      await session.observeChannel(['tsugu_shareRoom'])
       const tsuguUserData = await observeUserTsugu(session)
-      await roomNumber(config, session as Session<'tsugu', never>, tsuguUserData, number, session.content)
+      await roomNumber(config, session as Session<'tsugu', 'tsugu_shareRoom'>, tsuguUserData, number, session.content)
       return next();
     } else {
       return next();
@@ -565,6 +568,41 @@ export function apply(ctx: Context, config: Config) {
       }
       else {
         return '抽卡功能已关闭'
+      }
+    })
+
+  //群相关
+  ctx.command("群聊车牌转发 <word:text>", '开关群聊车牌转发功能')
+    .usage('开关群聊车牌转发功能，需要管理员权限')
+    .example('开启群聊车牌转发')
+    .shortcut('开启群聊车牌转发', { args: ['on'] })
+    .shortcut('关闭群聊车牌转发', { args: ['off'] })
+    .channelFields(["tsugu_shareRoom"])
+    .userFields(['authority'])
+    .action(async ({ session }, text) => {
+      // 获取 session.event.member.roles 和 session.author.roles
+      const eventMemberRoles = session.event.member.roles || [];
+      const authorRoles = session.author.roles || [];
+      // 合并两个角色列表并去重
+      const roles = Array.from(new Set([...eventMemberRoles, ...authorRoles]));
+      // 检查是否有所需角色
+      const hasRequiredRole = roles.includes('admin') || roles.includes('owner');
+      // 检查用户是否有足够的权限：authority > 1 或者角色是 admin 或 owner
+      if (session.user.authority > 1 || hasRequiredRole) {
+        switch (text) {
+          case "on":
+          case "开启":
+            session.channel.tsugu_shareRoom = true;
+            return "开启成功";
+          case "off":
+          case "关闭":
+            session.channel.tsugu_shareRoom = false;
+            return "关闭成功";
+          default:
+            return "无效指令";
+        }
+      } else {
+        return "您没有权限执行此操作";
       }
     })
   /*
