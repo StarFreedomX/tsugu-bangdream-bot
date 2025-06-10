@@ -15,8 +15,8 @@ function loadConfig(): CarKeyword {
 
 const carKeywordConfig = loadConfig();
 
-export async function roomNumber(config: Config, session: Session<'tsugu', never>, user: tsuguUser, number: number, raw_message: string) {
-    if (!user.shareRoomNumber) {
+export async function roomNumber(config: Config, session: Session<'tsugu', 'tsugu_shareRoom'>, user: tsuguUser, number: number, raw_message: string) {
+    if (!user.shareRoomNumber || !session.channel?.tsugu_shareRoom) {
         return
     }
     let isCar = false
