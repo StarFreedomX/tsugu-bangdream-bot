@@ -212,6 +212,7 @@ export function apply(ctx: Context, config: Config) {
     .action(async ({ session }, serverName) => {
       let mainServer: Server
       if (serverName) {
+        if (serverName.length > 3)return ;
         const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
         if (serverFromServerNameFuzzySearch == -1) {
           return '错误: 服务器名未能匹配任何服务器'
