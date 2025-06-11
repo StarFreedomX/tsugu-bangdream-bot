@@ -29,10 +29,12 @@ router.post(
         // 检查 text 和 fuzzySearchResult 是否同时存在
         if (text && fuzzySearchResult) {
             res.status(422).json({ status: 'failed', data: 'text 与 fuzzySearchResult 不能同时存在' });
+            return;
         }
         // 检查 text 和 fuzzySearchResult 是否同时不存在
         if (!text && !fuzzySearchResult) {
             res.status(422).json({ status: 'failed', data: '不能同时不存在 text 与 fuzzySearchResult' });
+            return;
         }
 
         try {
