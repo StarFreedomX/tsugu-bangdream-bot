@@ -382,6 +382,18 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSong(config, displayedServerList, text)
       return paresMessageList(list)
     })
+  ctx.command("物量查曲 <notes:number>", "根据物量查曲", cmdConfig)
+    .usage('根据歌曲谱面的note数查询曲目信息')
+    .example('物量查曲 947 :返回存在谱面note数为947的所有曲目')
+    .action(async ({ session }, notes) => {
+      if (notes == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 物量查曲`
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      const displayedServerList = tsuguUserData.displayedServerList
+      const list = await commandSong(config, displayedServerList, `nts${notes}`)
+      return paresMessageList(list)
+    })
   ctx.command("查谱面 <songId:integer> [difficultyText:text]", "查谱面", cmdConfig)
     .usage('根据曲目ID与难度查询铺面信息')
     .example('查谱面 1 :返回1号曲的所有铺面').example('查谱面 1 expert :返回1号曲的expert难度铺面')
