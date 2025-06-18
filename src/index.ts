@@ -342,7 +342,7 @@ export function apply(ctx: Context, config: Config) {
       }else if(options?.player){
         comparePlayerUid = Number(options?.player);
       }
-      if (options?.time && !/^[0-9]+$/.test(String(options.player))){
+      if (options?.time && !/^[0-9]+$/.test(String(options.time))){
         return '参数time输入无效，请指定时间长度(分钟)';
       }
       const list = await commandTopRateRanking(config, mainServer, options?.time, compareTier, comparePlayerUid)
