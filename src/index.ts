@@ -25,6 +25,7 @@ import { getRemoteDBUserData } from './api/remoteDB'
 import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySearch'
 import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
+import {commandTopRateRanking} from "./commands/topRateRanking";
 
 export const name = 'tsugu-bangdream-bot';
 export const inject = ['database'];
@@ -317,6 +318,34 @@ export function apply(ctx: Context, config: Config) {
         mainServer = serverFromServerNameFuzzySearch
       }
       const list = await commandTopRateDetail(config, options.count, playerId, tier, mainServer)
+      return (paresMessageList(list))
+    })
+  ctx.command('前十车速 [serverName:string]', '查询当前前十车速排名', cmdConfig)
+    .option('time', '-t <time:number> 指定时间范围，默认30(单位min)')
+    .option('player', '-p <player:string> 指定玩家')
+    .action(async ({ session, options }, serverName) => {
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      let compareTier = undefined;
+      let comparePlayerUid = undefined;
+      if (options?.player?.startsWith('t')){
+        compareTier = Number(options.player.slice(1));
+      }else if (options?.player && !/^[0-9]+$/.test(options.player)){
+        return '参数player输入无效，请指定正确排名或uid';
+      }else if(options?.player){
+        comparePlayerUid = Number(options?.player);
+      }
+      if (options?.time && !/^[0-9]+$/.test(String(options.player))){
+        return '参数time输入无效，请指定时间长度(分钟)';
+      }
+      const list = await commandTopRateRanking(config, mainServer, options?.time, compareTier, comparePlayerUid)
       return (paresMessageList(list))
     })
   ctx.command("查卡 <word:text>", "查卡", cmdConfig)
