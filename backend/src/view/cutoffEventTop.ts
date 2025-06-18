@@ -277,6 +277,8 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
   })
 
   all.push(drawDatablock({ list }));
+  var event = new Event(eventId);
+  all.push(await drawEventDatablock(event, [mainServer]));
 
   let buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
   return [buffer];
