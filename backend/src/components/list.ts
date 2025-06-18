@@ -128,7 +128,7 @@ export function drawListTextWithImages({
                 y += 0
             else if (align == 'bottom')
                 y += Height - tempHeight
-            else 
+            else
                 y += (Height - tempHeight) / 2
             if (typeof element === "string") {
                 ctx.fillText(element, x, y + textSize)
@@ -195,7 +195,7 @@ export function drawTipsInList({
 
 export async function drawListByServerList(content: Array<string | null>, key?: string, serverList: Server[] = globalDefaultServer, maxWidth = 800) {
     var tempcontent: Array<string | Image | Canvas> = []
-    
+
     // 获取每个服务器的内容对应关系
     const contentMap = new Map<string, Server[]>()
     // 分组服务器，根据相同的内容将服务器归类
@@ -205,7 +205,7 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
         if (serverContent == null) {
             continue;
         }
-        
+
         if (!contentMap.has(serverContent)) {
             contentMap.set(serverContent, []);
         }
@@ -243,8 +243,20 @@ export async function drawListByServerList(content: Array<string | null>, key?: 
 }
 
 
-//横向组合较短list，高度为最高的list，宽度平分
-export function drawListMerge(imageList: Array<Canvas | Image>, maxWidth: number = 800, drawLine: boolean = false, align: "top" | "bottom" | "center" = "top"): Canvas {
+//横向组合较短list，高度为最高的list，宽度平分或指定
+export function drawListMerge(imageList: Array<Canvas | Image>, maxWidth: number = 800, drawLine: boolean = false, align: "top" | "bottom" | "center" = "top", widthList?: number[]): Canvas {
+
+
+  // 计算每个元素的绘制宽度
+  let finalWidthList: number[] = [];
+  if (widthList && widthList.length === imageList.length) {
+    finalWidthList = widthList;
+  } else {
+    finalWidthList = Array(imageList.length).fill(maxWidth / imageList.length);
+  }
+  // 计算总宽度
+  const totalWidth = finalWidthList.reduce((sum, w) => sum + w, 0);
+
     var maxHeight = 0
     for (let i = 0; i < imageList.length; i++) {
         const element = imageList[i];
@@ -252,7 +264,7 @@ export function drawListMerge(imageList: Array<Canvas | Image>, maxWidth: number
             maxHeight = element.height
         }
     }
-    var canvas = new Canvas(maxWidth, maxHeight)
+    var canvas = new Canvas(totalWidth, maxHeight)
     var ctx = canvas.getContext('2d')
     var x = 0
     const line: Canvas = drawDottedLine({
@@ -274,14 +286,15 @@ export function drawListMerge(imageList: Array<Canvas | Image>, maxWidth: number
                 y = 0
             else if (align == "bottom")
                 y = maxHeight - element.height
-            else 
+            else
                 y = (maxHeight - element.height) / 2
             ctx.drawImage(element, x, y)
             if (drawLine && i > 0) {
                 ctx.drawImage(line, x - 5, 0)
             }
         }
-        x += maxWidth / imageList.length
+        //x += maxWidth / imageList.length
+        x += finalWidthList[i]
     }
     return canvas
 }
