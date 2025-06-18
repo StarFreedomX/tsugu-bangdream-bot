@@ -22,6 +22,7 @@ import { songRandomRouter } from '@/routers/songRandom'
 import { fuzzySearchRouter } from '@/routers/fuzzySearch'
 import { medleyCalRouter } from '@/routers/medleyCal'
 import { topRateDetailRouter } from './routers/topRateDetail';
+import { topRateRankingRouter } from './routers/topRateRanking';
 import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
@@ -54,6 +55,7 @@ app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);
 app.use('/medleyCal', medleyCalRouter);
 app.use('/topRateDetail', topRateDetailRouter);
+app.use('/topRateRanking', topRateRankingRouter)
 app.use('/searchComposition', searchCompositionRouter)
 
 // console.log(process.env)
