@@ -4,13 +4,18 @@ import { Bestdoriurl, tierListOfServer } from '@/config';
 import { Server } from '@/types/Server';
 import { Event } from '@/types/Event';
 import { predict } from '@/api/cutoff.cjs'
-
+import { continuePredict } from '@/predict/dataProcess';
+import { getHistory, saveHistory } from '@/predict/predictHistory';
 export class Cutoff {
     eventId: number;
     server: Server;
     tier: number;
     isExist = false;
     cutoffs: { time: number, ep: number }[];
+    predictResult: { time: number, ep: number}[];
+    historyPredict: {
+        [timestamp: number]: number
+    }
     eventType: string;
     latestCutoff: { time: number, ep: number };
     rate: number | null;
@@ -62,7 +67,7 @@ export class Cutoff {
         let cutoffData
         //如果cutoff的活动已经结束，则使用缓存
         const time = new Date().getTime()
-        if (time < this.endAt + 1000 * 60 * 60 * 24 * 2) {
+        if (time < this.endAt + 1000 * 60 * 60 * 24 * 7) {
             cutoffData = await callAPIAndCacheResponse(`${Bestdoriurl}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`)
         }
         else {
@@ -98,14 +103,29 @@ export class Cutoff {
         else {
             this.rate = rateData.rate
         }
+        this.predictResult = []
         if (this.status == 'in_progress') {
             this.predict()
         }
+        this.historyPredict = getHistory(this.eventId, this.tier, this.server, true)
+        if (this.predictResult.length > 0 && !this.historyPredict[this.predictResult[0].time]) {
+            this.historyPredict[this.predictResult[0].time] = this.predictEP
+            saveHistory(this.eventId, this.tier, this.server, true, this.historyPredict)
+        }
         this.isInitfull = true
     }
-    predict(): number {
+    predict() {
         if (this.isExist == false) {
             return
+        }
+        if (this.server == Server.cn) {
+            this.predictResult = getHistory(this.eventId, this.tier, this.server, false)
+            if (this.predictResult.length == 0 || this.predictResult[0].time <= this.cutoffs.at(-1).time) {
+                this.predictResult = continuePredict(this.eventId, this.tier, this.server, this.cutoffs)
+                saveHistory(this.eventId, this.tier, this.server, false, this.predictResult)
+            }
+            this.predictEP = Math.floor(this.predictResult.at(-1).ep)
+            return this.predictEP
         }
         const event = new Event(this.eventId)
         let start_ts = Math.floor(event.startAt[this.server] / 1000)

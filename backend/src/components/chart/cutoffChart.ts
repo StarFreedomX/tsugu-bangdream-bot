@@ -52,6 +52,37 @@ export async function drawCutoffChart(cutoffList: Cutoff[], setStartToZero = fal
         })
 
         if (cutoff.status == 'in_progress') {
+            if (cutoff.predictResult.length > 0) {
+                let data = []
+                data = cutoff.predictResult.map(({time, ep}) => { return {x: new Date(time - +setStartToZero * cutoff.startAt), y: ep} })
+                datasets.push({
+                    label: `T${cutoff.tier} 预测走势`,
+                    borderColor: [tempColor.getRGBA(1)],
+                    backgroundColor: [tempColor.getRGBA(1)],
+                    data: data,
+                    borderWidth: 5,
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                })
+                if (cutoff.historyPredict && Object.keys(cutoff.historyPredict).length > 0) {
+                    data = Object.keys(cutoff.historyPredict).map((time) => { return {x: new Date(parseInt(time) - +setStartToZero * cutoff.startAt), y: cutoff.historyPredict[time]} })
+                    data.push({ x: new Date(cutoff.endAt - +setStartToZero * cutoff.startAt), y: cutoff.predictEP })
+                    datasets.push({
+                        label: `T${cutoff.tier} 历史预测线`,
+                        borderColor: [tempColor.getRGBA(1)],
+                        backgroundColor: [tempColor.getRGBA(1)],
+                        data: data,
+                        borderWidth: 5,
+                        borderDash: [20, 10],
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                    })
+                }
+                continue
+            }
             if (cutoff.predictEP != null && cutoff.predictEP != 0) {
                 let data = []
                 if (setStartToZero) {
@@ -60,7 +91,6 @@ export async function drawCutoffChart(cutoffList: Cutoff[], setStartToZero = fal
                 else {
                     data = [{ x: new Date(cutoff.startAt), y: cutoff.predictEP }, { x: new Date(cutoff.endAt), y: cutoff.predictEP }]
                 }
-                const tempColor = getPresetColor(i)
                 datasets.push({
                     label: `T${cutoff.tier} 预测线`,
                     borderColor: [tempColor.getRGBA(1)],

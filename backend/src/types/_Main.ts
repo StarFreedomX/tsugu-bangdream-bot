@@ -1,10 +1,14 @@
-import { BestdoriapiPath, Bestdoriurl, configPath } from '@/config'
+import { BestdoriapiPath, Bestdoriurl, configPath, tierListOfServer } from '@/config'
 import { callAPIAndCacheResponse } from '@/api/getApi'
 import { readJSON } from '@/types/utils'
 import { readExcelFile } from '@/types/utils'
 import { logger } from '@/logger'
 import * as path from 'path'
 import { Server } from './Server'
+import { Cutoff } from './Cutoff'
+import { getPresentEvent } from './Event'
+import { loadModel } from '@/predict/predict'
+import {initHolidays } from '@/predict/dataProcess'
 
 const mainAPI: object = {}//main对象,用于存放所有api数据,数据来源于Bestdori网站
 
@@ -55,14 +59,30 @@ async function loadMainAPI(useCache: boolean = false) {
 
 }
 
+async function loadCutoffs() {
+    const server = Server.cn
+    const eventId = getPresentEvent(server).eventId
+    for (const tier of tierListOfServer[Server[server]]) {
+        const cutoff = new Cutoff(eventId, server, tier)
+        await cutoff.initFull()
+    }
+    logger('cutoff', "cutoff loaded")
+}
+
 logger('mainAPI', "initializing...")
-loadMainAPI(true).then(() => {
+loadMainAPI(true).then(async () => {
     logger('mainAPI', "initializing done")
-    loadMainAPI()
+    // loadMainAPI()
+    await loadModel()
+    await initHolidays()
+    loadCutoffs().then(() => {
+        logger('cutoff', "initializing done")
+    })
 })
 
 
 
 setInterval(loadMainAPI, 1000 * 60 * 5)//5分钟更新一次
+setInterval(loadCutoffs, 1000 * 60 * 60 * 2)//2小时更新一次
 
 export default mainAPI

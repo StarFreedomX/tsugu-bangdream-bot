@@ -34,10 +34,12 @@
     "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
+    "@tensorflow/tfjs-node": "^4.22.0",
     "@types/level": "^6.0.3",
     "axios": "^1.6.8",
     "chart.js": "^4.4.8",
     "chartjs-adapter-moment": "^1.0.1",
+    "chinese-holidays": "^1.7.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.0.1",

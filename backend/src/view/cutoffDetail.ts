@@ -36,7 +36,6 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
 
     //如果活动在进行中    
     if (cutoff.status == 'in_progress') {
-        cutoff.predict()
         if (cutoff.predictEP == null || cutoff.predictEP == 0) {
             var predictText = '?'
         }

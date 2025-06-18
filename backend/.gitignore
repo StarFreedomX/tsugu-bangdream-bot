@@ -19,4 +19,6 @@ tsconfig.tsbuildinfo
 *.sln
 cache/*
 logs/*
-run_normal.bat
+src/predict/__pycache__/*
+src/predict/history/*
+src/predict/model/*.h5
