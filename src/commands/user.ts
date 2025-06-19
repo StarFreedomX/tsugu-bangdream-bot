@@ -51,20 +51,30 @@ export async function commandBindPlayer(config: Config, session: Session<'tsugu'
 
     await session.send(`正在绑定来自 ${serverNameFullList[server]} 账号，请将你的\n评论(个性签名)\n或者\n你的当前使用的卡组的卡组名(乐队编队名称)\n改为以下数字后，直接发送你的玩家id\n${tempID}`)
 
-    // 等待下一步录入
-    const input = await session.prompt(bindingPlayerPromptWaitingTime)
-
-    // 处理input，检测是否为数字
+    let retryTimes = 5;
     let playerId: number
-    // prompt超时
-    if (!input) {
+    while (retryTimes-- > 0) {
+      // 等待下一步录入
+      const input = await session.prompt(bindingPlayerPromptWaitingTime)
+
+
+      // prompt超时
+      if (!input) {
         return '错误: 等待超时'
-    }
+      }
+      // 处理input，检测是否为数字
+      playerId = parseInt(input)
 
-    playerId = parseInt(input)
+      if (Number.isNaN(playerId)) {
+        if (retryTimes <= 0)
+          return '错误: 无效的玩家id'
+        else
+          await session.send('错误: 无效的玩家id，请重新输入');
+      } else {
+        break;
+      }
 
-    if (Number.isNaN(playerId)) {
-        return '错误: 无效的玩家id'
+
     }
 
     // 验证玩家信息，如果使用远程服务器，则从远程服务器获取验证码
