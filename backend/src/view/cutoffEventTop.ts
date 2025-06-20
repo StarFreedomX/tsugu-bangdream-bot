@@ -309,6 +309,7 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
   const now = cutoffEventTop.points.at(-1).time;
   const top10List: {uid: number, point: number}[] = cutoffEventTop.getLatestRanking();
   const top10_Old: {time: number, uid: number, value: number}[] = findTargetTimeRankingGroup(cutoffEventTop.points,now - windowTimeLimit * 60 * 1000);
+  const old_time = top10_Old?.[0]?.time;
   const top10_ranking: {
     ranking: number,
     uid: number,
@@ -340,7 +341,7 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
       speedInTime: playerSpeedInfo.speed,
       speedRanking: playerSpeedInfo.speedRanking,
       nowTime: (new Date(now)).toLocaleString(),
-      oldTime: (new Date(oldData.time)).toLocaleString(),
+      oldTime: (new Date(old_time)).toLocaleString(),
     })
   })
   return top10_ranking;
