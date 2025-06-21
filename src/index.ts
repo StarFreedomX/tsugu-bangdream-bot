@@ -320,10 +320,41 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandTopRateDetail(config, options.count, playerId, tier, mainServer)
       return (paresMessageList(list))
     })
-  ctx.command('前十车速 [serverName:string]', '查询当前前十车速排名', cmdConfig)
-    .option('time', '-t <time:number> 指定时间范围，默认30(单位min)')
+
+  ctx.command('前十车速 [commandArgs:text]', '查询当前前十车速排名', cmdConfig)
+    .option('time', '-t <time:number> 指定时间范围，默认60(单位min)')
     .option('player', '-p <player:string> 指定玩家')
-    .action(async ({ session, options }, serverName) => {
+    .action(async ({ session, options }, commandArgs) => {
+      //识别时间，格式为纯数字/数字min/数字h/数字m
+      const isTime = (s: string) => (/^\d+$/.test(s) ? +s <= 10000 && +s > 10 : /^\d+(min|h|m)$/i.test(s))
+      //识别player，格式为纯数字/t数字/p数字
+      const isPlayer = (s: string) => (/^\d+$/.test(s) ? (+s > 10000 || (+s > 0 && +s <= 10)) : /^t([1-9]|10)$/i.test(s) || /^p\d+$/i.test(s))
+      const parseTimeToMinutes = (timeStr: string): number => {
+        const m = timeStr.toLowerCase().match(/^(\d+)(min|h|m)?$/)
+        return m ? parseFloat(m[1]) * (m[2] === 'h' ? 60 : 1): undefined;
+      }
+      let player = options?.player;
+      let time = options?.time;
+      let serverName = undefined;
+      if (commandArgs?.length)
+        for (const arg of commandArgs?.trim()?.split(/\s+/g)){
+          if (isTime(arg)) {
+            time ??= parseTimeToMinutes(arg);
+          }else if (isPlayer(arg)){
+            const turnT = (arg: string) => {
+              if(/^\d+$/.test(arg)) {
+                const num = parseInt(arg);
+                if (num >= 1 && num <= 10) {
+                  return `t${num}`;
+                }
+              }
+              return arg;
+            }
+            player ??= turnT(arg).replace(/^p/i, '');
+          }else if (!/\d/.test(arg)){
+            serverName ??= arg;
+          }
+        }
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -335,17 +366,17 @@ export function apply(ctx: Context, config: Config) {
       }
       let compareTier = undefined;
       let comparePlayerUid = undefined;
-      if (options?.player?.startsWith('t')){
-        compareTier = Number(options.player.slice(1));
-      }else if (options?.player && !/^[0-9]+$/.test(options.player)){
+      if (player?.startsWith('t')){
+        compareTier = Number(player.slice(1));
+      }else if (player && !/^[0-9]+$/.test(player)){
         return '参数player输入无效，请指定正确排名或uid';
-      }else if(options?.player){
-        comparePlayerUid = Number(options?.player);
+      }else if(player){
+        comparePlayerUid = Number(player);
       }
-      if (options?.time && !/^[0-9]+$/.test(String(options.time))){
+      if (time && !/^[0-9]+$/.test(String(time))){
         return '参数time输入无效，请指定时间长度(分钟)';
       }
-      const list = await commandTopRateRanking(config, mainServer, options?.time, compareTier, comparePlayerUid)
+      const list = await commandTopRateRanking(config, mainServer, time, compareTier, comparePlayerUid)
       return (paresMessageList(list))
     })
   ctx.command("查卡 <word:text>", "查卡", cmdConfig)
