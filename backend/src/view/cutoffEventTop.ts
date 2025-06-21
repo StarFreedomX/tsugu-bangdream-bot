@@ -305,7 +305,7 @@ export function getRatingByPlayer(points: Array<{
     })
 }
 
-export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 30, compareTier: number, comparePlayerUid: number) {
+export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 60, compareTier: number, comparePlayerUid: number) {
   const now = cutoffEventTop.points.at(-1).time;
   const top10List: {uid: number, point: number}[] = cutoffEventTop.getLatestRanking();
   const top10_Old: {time: number, uid: number, value: number}[] = findTargetTimeRankingGroup(cutoffEventTop.points,now - windowTimeLimit * 60 * 1000);
@@ -404,7 +404,7 @@ function computeSpeed(
 ): { uid: number; speed: number; speedRanking: number }[] {
   const speed: { uid: number; speed: number; speedRanking: number }[] = [];
   //无数据的默认值
-  const fallbackValue = top10_Old[9]?.value ?? 0;
+  const fallbackValue = top10_Old.at(-1)?.value ?? 0;
   //创建map集合方便查询
   const oldValueMap = new Map<number, number>();
   for (const { uid, value } of top10_Old) {
