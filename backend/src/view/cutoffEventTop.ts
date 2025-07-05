@@ -153,6 +153,152 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         }
         all.push(drawDatablock({ list, topLeftText: `最近${maxCount}次分数变化`}))
     }
+    //CP活cp情况统计
+    const nowEvent = new Event(eventId);
+    if (nowEvent.eventType === 'challenge') {
+      const cpLists = [];
+      let multiPlayTimes = 0;
+      let multiPlayCPs = 0;
+      let challengePlayTimes = 0;
+      let changeCPs = 0;
+
+      const extendedRating = [...playerRating, {
+        time: nowEvent.startAt[mainServer],
+        value: 0
+      }];
+
+      let livePoint = [];
+      let cpPoints = []
+      const avg = (arr: number[]) => arr.length ? arr.reduce((sum, val) => sum + val, 0) / arr.length : 0;
+      for (let i = 0; i < extendedRating.length - 1; i++) {
+        const current = extendedRating[i]
+        if (current.value <= 0) continue
+
+        let j = i + 1
+        let crossedSeparator = false
+
+        //寻找下一个有效的分数值
+        while (j < extendedRating.length) {
+          if (extendedRating[j].value === -1) {
+            crossedSeparator = true
+          }else if (extendedRating[j].value >= 0) break
+          j++
+        }
+
+        //越界保护
+        if (j >= extendedRating.length) break
+        //计算分数增量
+        const next = extendedRating[j]
+        const diff = current.value - next.value
+
+        if (diff === 0) continue
+
+        if (crossedSeparator) {
+          const timesPerHour = 26
+          //跨越-1(出现中断点，需合理分配协力和清理cp)
+          const avgLivePoints = (avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint) || avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints)/8 || 11000);
+          const avgCPPoints = (avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints) || avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint)*8 || 85000);
+          const diffHour = (current.time - next.time) / (1000 * 60 * 60);
+          const multiPlaySpeed = avgLivePoints * timesPerHour;
+          const cpPlaySpeed = avgCPPoints * timesPerHour;
+          /*
+          计算配比
+          若协力直线能直接到达目标pt，那么全当协力算
+          若不是，直接按拉满算
+          然后计算协力直线和cp直线交点的解
+           */
+
+          //判断能否达到线
+          const reachable = diffHour * multiPlaySpeed > diff;
+          if (reachable) {
+            multiPlayTimes += diffHour * timesPerHour;
+            const addCPs = diff/20;
+            multiPlayCPs += addCPs;
+            changeCPs += addCPs;
+          }else{
+            //计算交点
+            /*
+            (a是协力时速，b是cp时速，d是分差，t是总时间)
+            a * t_1 + b * t_2 = d
+            t_1 + t_2 = t
+            => a * t_1 + b * (t - t_1) = d
+            => (a - b) * t_1 + b * t = d
+            => t_1 = (d - b * t) / (a - b)
+            t_2 = t - t_1
+             */
+            const [a,b,d,t] = [multiPlaySpeed,cpPlaySpeed,diff,diffHour];
+            const t_1 = (d - b * t) / (a - b);
+            const t_2 = t - t_1;
+            multiPlayTimes += t_1 * timesPerHour;
+            multiPlayCPs += a * t_1 / 20;
+            changeCPs += a * t_1 / 20 - t_2 * timesPerHour * 1600;
+            /*console.log('avgLivePoints ',avgLivePoints,
+              '\navgCPPoints ', avgCPPoints,
+              '\naddMultiPlayHour ', t_1,
+              '\naddCPPlayHour ', t_2,
+              '\nmultiPlaySpeed ',multiPlaySpeed,
+              '\ncpPlaySpeed ',cpPlaySpeed,
+              '\n+ ',t_1 * a / 20,
+              '\n- ',t_2 * 26 * 1600,
+              '\ncpPoints', cpPoints,
+              '\nlivePoint', livePoint,
+              '\n-----------------------------')*/
+          }
+        } else if (diff > 50000) {
+          challengePlayTimes += 1;
+          changeCPs -= 1600;
+          cpPoints.push(diff)
+        } else {
+          //记录一把分数
+          if (diff > 8000 && diff < 20000)
+            livePoint.push(diff)
+          multiPlayTimes += 1;
+          const addCPs = diff/20;
+          multiPlayCPs += addCPs;
+          changeCPs += addCPs;
+        }
+
+        // 跳到下一个有效 pair（防止重复处理）
+        i = j - 1
+      }
+
+      cpLists.push(drawListMerge([
+        drawList({text: '估计协力次数'}),
+        drawList({text: `${Math.floor(multiPlayTimes)}`}),
+      ],widthMax))
+      cpLists.push(line)
+      cpLists.push(drawListMerge([
+        drawList({text: '估计协力CP'}),
+        drawList({text: `${Math.floor(multiPlayCPs)}`}),
+      ],widthMax));
+      cpLists.push(line)
+      const avgLivePoints = Math.floor(avg(livePoint.length > 50 ? livePoint.slice(0, 50) : livePoint));
+      const avgCPPoints = Math.floor(avg(cpPoints.length > 50 ? cpPoints.slice(0, 50) : cpPoints));
+      cpLists.push(drawListMerge([
+        drawList({text: '把均pt(协力/CP)'}),
+        drawList({text: `${Math.floor(avg(livePoint))} / ${Math.floor(avg(cpPoints))}`}),
+      ],widthMax));
+      cpLists.push(line)
+      cpLists.push(drawListMerge([
+        drawList({text: '把均pt(近50把)'}),
+        drawList({text: `${avgLivePoints} / ${avgCPPoints}`}),
+      ],widthMax))
+      cpLists.push(line)
+      cpLists.push(drawListMerge([
+        drawList({text: '估计清CP次数'}),
+        drawList({text: `${Math.floor(challengePlayTimes)}`}),
+      ],widthMax))
+      cpLists.push(line)
+      cpLists.push(drawListMerge([
+        drawList({text: '估计CP积累'}),
+        drawList({text: `${Math.floor(changeCPs)}`}),
+      ],widthMax))
+      all.push(drawDatablock({ list: cpLists, topLeftText: `CP追踪`}))
+    }
+    //睡眠时间监测
+    {
+
+    }
     //近期统计数据
     const timeList = [1, 3, 12, 24]
     {
@@ -232,6 +378,7 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
   const top10SpeedRankingData = getTopRatingDuringTime(cutoffEventTop, time, compareTier, comparePlayerUid);
   const compareName = compareTier ? cutoffEventTop.getUserNameById(cutoffEventTop.getLatestRanking()[compareTier-1].uid) : (comparePlayerUid ? cutoffEventTop.getUserNameById(comparePlayerUid) : null);
   const headerStringArray = ['排名', 'uid', 'id', '分数', '分差', compareName ? `与${compareName}分差` : null, `${time}min分数变化`, '速度排名', '当前数据获取时间', '上次数据获取时间']
+  //const headerStringArray = ['順位', 'uid', 'id', 'ポイント', '上との差', compareName ? `${compareName}さんと差` : null, `${time}時速`, '時速ランキング', '今の時間', '1hスタート時間']
   const top10RankingTable: Canvas[][] = Array.from({ length: 10 }, () => []);
   const drawWidth = []
   const header: Canvas[] = [];
