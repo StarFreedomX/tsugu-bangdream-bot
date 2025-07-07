@@ -198,7 +198,9 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
           //跨越-1(出现中断点，需合理分配协力和清理cp)
           const avgLivePoints = (avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint) || avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints)/8 || 11000);
           const avgCPPoints = (avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints) || avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint)*8 || 85000);
-          const diffHour = (current.time - next.time) / (1000 * 60 * 60);
+          const crossHour = (current.time - next.time) / (1000 * 60 * 60)
+          const sleepTime = crossHour/8
+          const diffHour = crossHour - sleepTime;
           const multiPlaySpeed = avgLivePoints * timesPerHour;
           const cpPlaySpeed = avgCPPoints * timesPerHour;
           /*
@@ -295,10 +297,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
       ],widthMax))
       all.push(drawDatablock({ list: cpLists, topLeftText: `CP追踪`}))
     }
-    //睡眠时间监测
-    {
 
-    }
     //近期统计数据
     const timeList = [1, 3, 12, 24]
     {
@@ -356,6 +355,113 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
 
     return [buffer];
+}
+
+//睡眠时间监测
+export async function drawTopSleepStat(eventId: number, playerId: number, tier: number, mainServer: Server, time: number, compress: boolean) {
+  var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
+  await cutoffEventTop.initFull(0);
+  if (!cutoffEventTop.isExist) {
+    return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
+  }
+  if (cutoffEventTop.status != "in_progress") {
+    return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+  }
+
+  var all = [];
+  const widthMax = 1000, line: Canvas = drawDottedLine({
+    width: widthMax,
+    height: 30,
+    startX: 5,
+    startY: 15,
+    endX: widthMax - 5,
+    endY: 15,
+    radius: 2,
+    gap: 10,
+    color: "#a8a8a8"
+  })
+  all.push(drawTitle('查睡眠', `${serverNameFullList[mainServer]}`));
+  {
+    const list: Array<Image | Canvas> = [];
+    //名片
+    var userInRankings = cutoffEventTop.getLatestRanking();
+    for (let i = 0; i < userInRankings.length; i++) {
+      if (playerId && userInRankings[i].uid != playerId || tier && tier != i + 1) {
+        continue
+      }
+      playerId = userInRankings[i].uid
+      var user = cutoffEventTop.getUserByUid(playerId);
+      var playerRankingImage = await drawPlayerRankingInList(user, 'white', mainServer);
+      if (playerRankingImage != undefined) {
+        list.push(resizeImage({ image: playerRankingImage, widthMax }));
+      }
+    }
+    if (list.length > 0) {
+      all.push(drawDatablock({ list, maxWidth: widthMax }))
+    }
+    else
+      return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
+  }
+  const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId)
+  const list = [];
+  list.push(drawListMerge([drawList({ key: '日期' }), drawList({ key: '休息开始时间' }), drawList({ key: '休息结束时间' }), drawList({ key: '休息时长' })], widthMax));
+  const sleep: {start: number; end: number}[] = []
+  const limitTime = (time || 30 )* 60 * 1000;
+  let tmpTime = -1;
+  let tmpValue = 0;
+  for (let i = playerRating.length - 1; i >= 0; i--) {
+    if (playerRating[i].value <= 0) {
+      tmpTime = -1;
+      tmpValue = 0;
+      continue;
+    }
+    if (playerRating[i].value === tmpValue) continue;
+    else if (tmpTime === -1 && playerRating[i].value >= 0)
+      [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
+    else {
+      if (playerRating[i].time - tmpTime > limitTime){
+        sleep.push({start: tmpTime, end: playerRating[i].time});
+      }
+      [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
+    }
+  }
+  let totalSleepTime = 0;
+  const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time%60}min`
+  if (sleep.length > 0) {
+
+    for (const {start, end} of sleep) {
+      const st = new Date(start), ed = new Date(end)
+      const diff = Math.floor((end - start)/(1000*60));
+      totalSleepTime += end - start;
+      const formatDate = (date) => {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${month}/${day}`;
+      };
+
+      list.push(drawListMerge([
+        drawList({text: `${formatDate(st)}`}),
+        drawList({text: `${String(st.getHours()).padStart(2, '0')}:${String(st.getMinutes()).padStart(2, '0')}`}),
+        drawList({text: `${String(ed.getHours()).padStart(2, '0')}:${String(ed.getMinutes()).padStart(2, '0')}`}),
+        drawList({text: toTimeStr(diff)})
+      ], widthMax))
+      list.push(line)
+    }
+    const nowEvent = new Event(eventId);
+    list.push(line)
+    list.push(drawListMerge([
+      drawList({text: '总计: '}),
+      drawList({text: toTimeStr(Math.floor(totalSleepTime/(1000 * 60)))}),
+      drawList({text: '平均每天: '}),
+      drawList({text: toTimeStr(Math.floor(24*60*totalSleepTime/(Date.now() - nowEvent.startAt[mainServer])))}),
+    ], widthMax))
+  }else {
+    list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
+  }
+  all.push(drawDatablock({ list, topLeftText: `休息时间统计`}))
+  var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
+
+  return [buffer];
 }
 
 export async function drawTopRateRanking(eventId: number, mainServer: Server, compress: boolean, time: number, compareTier: number, comparePlayerUid: number) {

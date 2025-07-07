@@ -26,6 +26,7 @@ import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySe
 import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
 import {commandTopRateRanking} from "./commands/topRateRanking";
+import {commandTopSleepStat} from "./commands/commandSleepStat";
 
 export const name = 'tsugu-bangdream-bot';
 export const inject = ['database'];
@@ -377,6 +378,39 @@ export function apply(ctx: Context, config: Config) {
         return '参数time输入无效，请指定时间长度(分钟)';
       }
       const list = await commandTopRateRanking(config, mainServer, time, compareTier, comparePlayerUid)
+      return (paresMessageList(list))
+    })
+  ctx.command('查睡眠 <playerId:string> [serverName:string]', '查询前十睡眠状况', cmdConfig)
+    .option('time', '-t <time:number> 指定时间边界，默认30(单位min)')
+    .action(async ({ session , options}, playerId, serverName) => {
+      if (playerId == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
+      }
+      var tier
+      if (isNaN(parseInt(playerId))) {
+        if (playerId[0] == 't' && !isNaN(parseInt(playerId.slice(1)))) {
+          tier = parseInt(playerId.slice(1))
+          playerId = undefined
+        }
+        else {
+          return `请确认输入玩家id或者排名格式正确`
+        }
+        if (tier > 10 || tier < 1) {
+          return `请确认输入的排名在1到10之间`
+        }
+      }
+      if (options.time && options.time < 5)
+        return '参数time输入无效，请输入一个不小于5的整数'
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      const list = await commandTopSleepStat(config, playerId, tier,options?.time || 30, mainServer)
       return (paresMessageList(list))
     })
   ctx.command("查卡 <word:text>", "查卡", cmdConfig)
