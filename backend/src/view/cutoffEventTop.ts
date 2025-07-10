@@ -58,9 +58,9 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     if (!cutoffEventTop.isExist) {
         return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
     }
-    if (cutoffEventTop.status != "in_progress") {
-        return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
-    }
+    //if (cutoffEventTop.status != "in_progress") {
+        //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+    //}
 
     var all = [];
     const widthMax = 1000, line: Canvas = drawDottedLine({
@@ -80,6 +80,8 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         // var event = new Event(eventId);
         // all.push(await drawEventDatablock(event, [mainServer]));
         //名片
+        var event = new Event(eventId);
+        all.push(await drawEventDatablock(event, [mainServer]));
         var userInRankings = cutoffEventTop.getLatestRanking();
         for (let i = 0; i < userInRankings.length; i++) {
             if (playerId && userInRankings[i].uid != playerId || tier && tier != i + 1) {
@@ -359,14 +361,15 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
 
 //睡眠时间监测
 export async function drawTopSleepStat(eventId: number, playerId: number, tier: number, mainServer: Server, time: number, compress: boolean) {
+  var event = new Event(eventId);
   var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
   await cutoffEventTop.initFull(0);
   if (!cutoffEventTop.isExist) {
-    return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
+    return [`错误: ${serverNameFullList[mainServer]} ${eventId} 活动不存在或数据不足`];
   }
-  if (cutoffEventTop.status != "in_progress") {
-    return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
-  }
+  //if (cutoffEventTop.status != "in_progress") {
+    //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+  //}
 
   var all = [];
   const widthMax = 1000, line: Canvas = drawDottedLine({
@@ -402,7 +405,7 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
     else
       return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
   }
-  const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId)
+  const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time<event.endAt[mainServer])
   const list = [];
   list.push(drawListMerge([drawList({ key: '日期' }), drawList({ key: '休息开始时间' }), drawList({ key: '休息结束时间' }), drawList({ key: '休息时长' })], widthMax));
   const sleep: {start: number; end: number}[] = []
@@ -415,8 +418,8 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
       tmpValue = 0;
       continue;
     }
-    if (playerRating[i].value === tmpValue) continue;
-    else if (tmpTime === -1 && playerRating[i].value >= 0)
+    if (playerRating[i].value === tmpValue && i > 0) continue;
+    else if (tmpTime === -1 && (playerRating[i].value >= 0))
       [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
     else {
       if (playerRating[i].time - tmpTime > limitTime){
@@ -453,12 +456,14 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
       drawList({text: '总计: '}),
       drawList({text: toTimeStr(Math.floor(totalSleepTime/(1000 * 60)))}),
       drawList({text: '平均每天: '}),
-      drawList({text: toTimeStr(Math.floor(24*60*totalSleepTime/(Date.now() - nowEvent.startAt[mainServer])))}),
+      drawList({text: toTimeStr(Math.floor(24*60*totalSleepTime/(playerRating[0].time - nowEvent.startAt[mainServer])))}),
     ], widthMax))
   }else {
     list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
   }
   all.push(drawDatablock({ list, topLeftText: `休息时间统计`}))
+
+  all.push(await drawEventDatablock(event, [mainServer]));
   var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
 
   return [buffer];
