@@ -15,6 +15,7 @@ router.post(
   '/',
   [
     body('mainServer').custom(isServer),
+    body('eventId').optional().isInt(),
     body('playerId').optional().isInt(),
     body('tier').optional().isInt(),
     body('time').optional().isInt(),
@@ -23,10 +24,10 @@ router.post(
   middleware,
   async (req: Request, res: Response) => {
 
-    const { mainServer, playerId, tier, time, compress } = req.body;
+    const { mainServer, eventId, playerId, tier, time, compress } = req.body;
 
     try {
-      const result = await commandTopSleepStat(getServerByServerId(mainServer), playerId, time, tier, compress);
+      const result = await commandTopSleepStat(getServerByServerId(mainServer), eventId, playerId, time, tier, compress);
       res.send(listToBase64(result));
     } catch (e) {
       console.log(e);
@@ -35,11 +36,11 @@ router.post(
   }
 );
 
-export async function commandTopSleepStat(mainServer: Server, playerId: number, time: number, tier: number, compress: boolean): Promise<Array<Buffer | string>> {
+export async function commandTopSleepStat(mainServer: Server, eventId: number, playerId: number, time: number, tier: number, compress: boolean): Promise<Array<Buffer | string>> {
   if (!playerId && !tier) {
     return ['请输入玩家id或排名']
   }
-  const eventId = getPresentEvent(mainServer).eventId
+  eventId ||= getPresentEvent(mainServer).eventId
   return await drawTopSleepStat(eventId, playerId, tier, mainServer,time, compress)
 }
 

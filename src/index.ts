@@ -380,11 +380,16 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandTopRateRanking(config, mainServer, time, compareTier, comparePlayerUid)
       return (paresMessageList(list))
     })
-  ctx.command('查睡眠 <playerId:string> [serverName:string]', '查询前十睡眠状况', cmdConfig)
+  ctx.command('查睡眠 <playerId:string> [eventId] [serverName:string]', '查询前十睡眠状况', cmdConfig)
     .option('time', '-t <time:number> 指定时间边界，默认30(单位min)')
-    .action(async ({ session , options}, playerId, serverName) => {
+    .action(async ({ session , options}, playerId, eventId, serverName) => {
       if (playerId == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
+      }
+
+      if(isNaN(Number(eventId))) {
+        serverName = eventId;
+        eventId = undefined;
       }
       var tier
       if (isNaN(parseInt(playerId))) {
@@ -410,7 +415,8 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
-      const list = await commandTopSleepStat(config, playerId, tier,options?.time || 30, mainServer)
+
+      const list = await commandTopSleepStat(config, eventId === undefined ? undefined : Number(eventId), playerId, tier,options?.time || 30, mainServer)
       return (paresMessageList(list))
     })
   ctx.command("查卡 <word:text>", "查卡", cmdConfig)
