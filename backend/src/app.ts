@@ -23,7 +23,7 @@ import { fuzzySearchRouter } from '@/routers/fuzzySearch'
 import { medleyCalRouter } from '@/routers/medleyCal'
 import { topRateDetailRouter } from './routers/topRateDetail';
 import { topRateRankingRouter } from './routers/topRateRanking';
-import {topSleepStatRouter} from "@/routers/topSleepStat";
+import { topSleepStatRouter } from "@/routers/topSleepStat";
 import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
