@@ -290,11 +290,15 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSearchPlayer(config, playerId, mainServer)
       return (paresMessageList(list))
     })
-  ctx.command('查岗 <playerId:string> [serverName:string]', '查询前十车速', cmdConfig)
+  ctx.command('查岗 <playerId:string> [eventId] [serverName:string]', '查询前十车速', cmdConfig)
     .option('count', '-c <count:number> 指定显示最近的几次分数变化，默认20次')
-    .action(async ({ session, options }, playerId, serverName) => {
+    .action(async ({ session, options }, playerId, eventId, serverName) => {
       if (playerId == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
+      }
+      if(isNaN(Number(eventId))) {
+        serverName = eventId;
+        eventId = undefined;
       }
       var tier
       if (isNaN(parseInt(playerId))) {
@@ -318,7 +322,7 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
-      const list = await commandTopRateDetail(config, options.count, playerId, tier, mainServer)
+      const list = await commandTopRateDetail(config, Number(eventId), options.count, playerId, tier, mainServer)
       return (paresMessageList(list))
     })
 
