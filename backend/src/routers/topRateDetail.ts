@@ -15,6 +15,7 @@ router.post(
     '/',
     [
         body('mainServer').custom(isServer),
+        body('eventId').optional().isInt(),
         body('playerId').optional().isInt(),
         body('tier').optional().isInt(),
         body('count').optional().isInt(),
@@ -23,10 +24,10 @@ router.post(
     middleware,
     async (req: Request, res: Response) => {
 
-        const { mainServer, playerId, tier, count, compress } = req.body;
+        const { mainServer, eventId, playerId, tier, count, compress } = req.body;
 
         try {
-            const result = await commandTopRateDetail(getServerByServerId(mainServer), playerId, tier, compress, count);
+            const result = await commandTopRateDetail(getServerByServerId(mainServer), eventId, playerId, tier, compress, count);
             res.send(listToBase64(result));
         } catch (e) {
             console.log(e);
@@ -35,11 +36,11 @@ router.post(
     }
 );
 
-export async function commandTopRateDetail(mainServer: Server, playerId: number, tier: number, compress: boolean, maxCount?: number): Promise<Array<Buffer | string>> {
+export async function commandTopRateDetail(mainServer: Server, eventId: number, playerId: number, tier: number, compress: boolean, maxCount?: number): Promise<Array<Buffer | string>> {
     if (!playerId && !tier) {
         return ['请输入玩家id或排名']
     }
-    const eventId = getPresentEvent(mainServer).eventId
+    eventId ||= getPresentEvent(mainServer).eventId
     return await drawTopRateDetail(eventId, playerId, tier, maxCount, mainServer, compress)
 }
 
