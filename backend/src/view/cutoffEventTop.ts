@@ -211,12 +211,21 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
           若不是，直接按拉满算
           然后计算协力直线和cp直线交点的解
            */
-
+          const getMax = (livePoint: number[]) => {
+            let max = avgLivePoints;
+            for (let i2 = 0; i2 < livePoint.length; i2++) {
+              if (livePoint[i2] > max && livePoint[i2]/avgLivePoints < 1.5) {
+                max = livePoint[i2];
+              }
+            }
+            return max;
+          }
           //判断能否达到线
-          const reachable = diffHour * multiPlaySpeed > diff;
+          const reachable = getMax(livePoint) * (28 * diffHour + 8/3) > diff;
           if (reachable) {
             multiPlayTimes += diffHour * timesPerHour;
-            const addCPs = diff/20;
+            const addCPs = Math.ceil(diff / avgLivePoints * Math.ceil(avgLivePoints / 20));
+            //const addCPs = Math.ceil(diff/20);
             multiPlayCPs += addCPs;
             changeCPs += addCPs;
           }else{
@@ -234,10 +243,12 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             const t_1 = (d - b * t) / (a - b);
             const t_2 = t - t_1;
             multiPlayTimes += t_1 * timesPerHour;
-            multiPlayCPs += a * t_1 / 20;
-            changeCPs += a * t_1 / 20 - t_2 * timesPerHour * 1600;
+            const addCPs = Math.ceil(a * t_1 / avgLivePoints * Math.ceil(avgLivePoints / 20)) - t_2 * timesPerHour * 1600;
+            multiPlayCPs += addCPs //Math.ceil(a * t_1 / 20);
+            changeCPs += addCPs //Math.ceil(a * t_1 / 20) - t_2 * timesPerHour * 1600;
             /*console.log('avgLivePoints ',avgLivePoints,
-              '\navgCPPoints ', avgCPPoints,
+              '\navgCPPoints ', avgCPPoin
+              ts,
               '\naddMultiPlayHour ', t_1,
               '\naddCPPlayHour ', t_2,
               '\nmultiPlaySpeed ',multiPlaySpeed,
@@ -257,7 +268,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
           if (diff > 8000 && diff < 20000)
             livePoint.push(diff)
           multiPlayTimes += 1;
-          const addCPs = diff/20;
+          const addCPs = Math.ceil(diff/20);
           multiPlayCPs += addCPs;
           changeCPs += addCPs;
         }
