@@ -418,9 +418,9 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
   }
   const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time<event.endAt[mainServer])
   const list = [];
-  list.push(drawListMerge([drawList({ key: '日期' }), drawList({ key: '休息开始时间' }), drawList({ key: '休息结束时间' }), drawList({ key: '休息时长' })], widthMax));
+  list.push(drawListMerge([drawList({ key: '日期' }), drawList({ key: '休息时段' }), drawList({ key: '休息时长' })], widthMax));
   const sleep: {start: number; end: number}[] = []
-  const limitTime = (time || 30 )* 60 * 1000;
+  const limitTime = (time || 25)* 60 * 1000;
   let tmpTime = -1;
   let tmpValue = 0;
   for (let i = playerRating.length - 1; i >= 0; i--) {
@@ -445,6 +445,14 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
 
     for (const {start, end} of sleep) {
       const st = new Date(start), ed = new Date(end)
+      const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
+      const offset = Math.floor((ed.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60) - Math.floor((st.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60)
+      // console.log(st.getTimezoneOffset())
+      if (offset > 0) {
+        const ctx = timeImage.getContext('2d')
+        ctx.font = "18px old,Microsoft Yahei"
+        ctx.fillText(`-${offset}`, 30, 13)
+      }
       const diff = Math.floor((end - start)/(1000*60));
       totalSleepTime += end - start;
       const formatDate = (date) => {
@@ -454,9 +462,8 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
       };
 
       list.push(drawListMerge([
-        drawList({text: `${formatDate(st)}`}),
-        drawList({text: `${String(st.getHours()).padStart(2, '0')}:${String(st.getMinutes()).padStart(2, '0')}`}),
-        drawList({text: `${String(ed.getHours()).padStart(2, '0')}:${String(ed.getMinutes()).padStart(2, '0')}`}),
+        drawList({text: `${formatDate(ed)}`}),
+        timeImage,
         drawList({text: toTimeStr(diff)})
       ], widthMax))
       list.push(line)
@@ -553,11 +560,174 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
   return [buffer];
 }
 
+export async function drawTopRunningStatus(eventId: number, playerId: number, tier: number, mainServer: Server, time: number, compress: boolean){
+  var event = new Event(eventId);
+  var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
+  await cutoffEventTop.initFull(0);
+  if (!cutoffEventTop.isExist) {
+    return [`错误: ${serverNameFullList[mainServer]} ${eventId} 活动不存在或数据不足`];
+  }
+  //if (cutoffEventTop.status != "in_progress") {
+  //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+  //}
+
+  var all = [];
+  const widthMax = 1000, line: Canvas = drawDottedLine({
+    width: widthMax,
+    height: 30,
+    startX: 5,
+    startY: 15,
+    endX: widthMax - 5,
+    endY: 15,
+    radius: 2,
+    gap: 10,
+    color: "#a8a8a8"
+  })
+  all.push(drawTitle('查稼动', `${serverNameFullList[mainServer]}`));
+  {
+    const list: Array<Image | Canvas> = [];
+    //名片
+    var userInRankings = cutoffEventTop.getLatestRanking();
+    for (let i = 0; i < userInRankings.length; i++) {
+      if (playerId && userInRankings[i].uid != playerId || tier && tier != i + 1) {
+        continue
+      }
+      playerId = userInRankings[i].uid
+      var user = cutoffEventTop.getUserByUid(playerId);
+      var playerRankingImage = await drawPlayerRankingInList(user, 'white', mainServer);
+      if (playerRankingImage != undefined) {
+        list.push(resizeImage({ image: playerRankingImage, widthMax }));
+      }
+    }
+    if (list.length > 0) {
+      all.push(drawDatablock({ list, maxWidth: widthMax }))
+    }
+    else
+      return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
+  }
+  const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time<event.endAt[mainServer])
+  const list = [];
+  list.push(drawListMerge([
+    drawList({ key: '日期' }),
+    drawList({ key: '稼动时间' }),
+    drawList({ key: '稼动把数' }),
+    drawList({ key: '把均pt' }),
+    drawList({ key: '稼动总pt' })
+  ], widthMax));
+  //const run: {start: number; end: number; type: 'stop'|'unknown'|'running'}[] = []
+  const limitTime = (time || 25)* 60 * 1000;
+  const run: { startTime: number, startValue: number, endTime: number, endValue: number, playTimes: number}[] = [];
+  let startTime: number | null = null;
+  let startValue: number | null = null;
+  let lastValue: number | null = null;
+  let tmpTimes: number = 0;
+  let lastActiveTime: number | null = null;
+  for (let i = playerRating.length - 1; i >= 0; i--) {
+    const {time, value} = playerRating[i];
+    if (value === -1 || i == 0){
+      //结束上一个
+      if (lastValue){
+        if (tmpTimes && tmpTimes > 1)
+          run.push({
+            startTime,
+            startValue,
+            endTime: lastActiveTime,
+            endValue: lastValue,
+            playTimes: tmpTimes,
+          })
+        //复位
+        startTime = time;
+        startValue = value;
+        lastValue = value;
+        lastActiveTime = time;
+        tmpTimes = 0;
+      }
+      continue;
+    }
+    if (lastValue == value) continue;
+    if (!lastValue || lastValue <= value) {
+      //检测超时
+      if (lastActiveTime && time - lastActiveTime >= limitTime) {
+        if (tmpTimes && tmpTimes > 1)
+          run.push({
+            startTime,
+            startValue,
+            endTime: lastActiveTime,
+            endValue: lastValue,
+            playTimes: tmpTimes,
+          })
+        //超时完复位
+        startTime = time;
+        startValue = lastValue;
+        lastValue = value;
+        lastActiveTime = time;
+        tmpTimes = 0;
+      }
+      if (!startValue) startValue = value;
+      if (!startTime) startTime = time;
+      lastActiveTime = time;
+      lastValue = value;
+      tmpTimes++;
+
+    }
+  }
+
+  const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time%60}min`
+  if (run.length > 0) {
+    let totalRunTime = 0;
+    //console.log(run)
+    for (const { startTime, startValue, endTime, endValue, playTimes} of run) {
+      const st = new Date(startTime), ed = new Date(endTime)
+      const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
+      const offset = Math.floor((ed.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60) - Math.floor((st.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60)
+      // console.log(st.getTimezoneOffset())
+      if (offset > 0) {
+        const ctx = timeImage.getContext('2d')
+        ctx.font = "18px old,Microsoft Yahei"
+        ctx.fillText(`-${offset}`, 30, 13)
+      }
+      const diff = Math.floor((endTime - startTime)/(1000*60));
+      totalRunTime += endTime - startTime;
+      const formatDate = (date) => {
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${month}/${day}`;
+      };
+
+      list.push(drawListMerge([
+        drawList({text: `${formatDate(ed)}`}),
+        timeImage,
+        drawList({text: String(playTimes)}),
+        drawList({text: String(Math.floor((endValue-startValue)/playTimes))}),
+        drawList({text: String(endValue - startValue)}),
+      ], widthMax,false,"top",[widthMax*0.15,widthMax*0.3,widthMax*0.15,widthMax*0.15,widthMax*0.25]))
+      list.push(line)
+    }
+    const nowEvent = new Event(eventId);
+    list.push(line)
+    list.push(drawListMerge([
+      drawList({text: '总计: '}),
+      drawList({text: toTimeStr(Math.floor(totalRunTime/(1000 * 60)))}),
+      drawList({text: '平均每天: '}),
+      drawList({text: toTimeStr(Math.floor(24*60*totalRunTime/(playerRating[0].time - nowEvent.startAt[mainServer])))}),
+    ], widthMax))
+  }else {
+    list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
+  }
+  all.push(drawDatablock({ list, topLeftText: `稼动时间统计`}))
+
+  all.push(await drawEventDatablock(event, [mainServer]));
+  var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
+
+  return [buffer];
+}
+
 export function getRatingByPlayer(points: Array<{
     time:number,
     uid:number,
     value:number
-}>, playerId: number) {
+}>, playerId: number)
+{
     const map = {}
     for (const info of points) {
         if (map[info.time] == undefined)
