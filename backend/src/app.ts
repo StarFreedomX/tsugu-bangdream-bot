@@ -24,6 +24,7 @@ import { medleyCalRouter } from '@/routers/medleyCal'
 import { topRateDetailRouter } from './routers/topRateDetail';
 import { topRateRankingRouter } from './routers/topRateRanking';
 import { topSleepStatRouter } from "@/routers/topSleepStat";
+import { topRunningStatusRouter } from "@/routers/topRunningStatus";
 import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
@@ -58,6 +59,7 @@ app.use('/medleyCal', medleyCalRouter);
 app.use('/topRateDetail', topRateDetailRouter);
 app.use('/topRateRanking', topRateRankingRouter)
 app.use('/topSleepStat', topSleepStatRouter)
+app.use('/topRunningStatus', topRunningStatusRouter)
 app.use('/searchComposition', searchCompositionRouter)
 
 // console.log(process.env)
