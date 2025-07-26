@@ -636,10 +636,10 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
             playTimes: tmpTimes,
           })
         //复位
-        startTime = time;
-        startValue = value;
-        lastValue = value;
-        lastActiveTime = time;
+        startTime = null;
+        startValue = null;
+        //lastValue = null;
+        lastActiveTime = startTime;
         tmpTimes = 0;
       }
       continue;
@@ -675,7 +675,7 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
   const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time%60}min`
   if (run.length > 0) {
     let totalRunTime = 0;
-    //console.log(run)
+    console.log(run)
     for (const { startTime, startValue, endTime, endValue, playTimes} of run) {
       const st = new Date(startTime), ed = new Date(endTime)
       const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
