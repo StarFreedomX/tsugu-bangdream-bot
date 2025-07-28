@@ -8,7 +8,10 @@ import { drawEventDatablock } from '@/components/dataBlock/event';
 import { drawDatablock } from '@/components/dataBlock';
 import { outputFinalBuffer } from '@/image/output';
 import { drawPlayerRankingInList } from '@/components/list/playerRanking';
-import { drawCutoffEventTopChart } from '@/components/chart/cutoffChart';
+import {
+  drawCutoffEventTopChart,
+  drawCutOffEventTopSingleChart,
+} from '@/components/chart/cutoffChart';
 import { songChartRouter } from '@/routers/songChart';
 import { drawList, drawListMerge } from '@/components/list';
 import { drawDottedLine } from '@/image/dottedLine';
@@ -560,6 +563,128 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
   return [buffer];
 }
 
+export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false) {
+  const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
+  await cutoffEventTop.initFull(0);
+  if (!cutoffEventTop.isExist) {
+    return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
+  }
+  if (cutoffEventTop.status != "in_progress") {
+    return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+  }
+
+
+  const all = [];
+  const widthMax = 3000;
+  all.push(drawTitle('十分速度', `${serverNameFullList[mainServer]}`));
+  let list = []
+  //const lastTime = cutoffEventTop.points[0]?.time || cutoffEventTop.startAt;
+  const rankingInTenMinute = cutoffEventTop.points.slice(-11*10);
+  const top10SpeedRankingData: {
+    ranking: number,
+    uid: number,
+    name: string,
+    point: number,
+    [add:number]: number,
+  }[] = [];
+  for (let i = 0; i < 10;i++) {
+    let {uid, point} = cutoffEventTop.getLatestRanking()[i]
+    const playerRating: {time:number, value:number}[] = getRatingByPlayer(rankingInTenMinute, uid);
+    //console.log(playerRating)
+
+    const add: number[] = []
+    for (let j = 0; j < playerRating.length-1;j++) {
+      if (playerRating[j].value > 0 && playerRating[j+1].value > 0) {
+        add.push(playerRating[j].value - playerRating[j+1].value)
+      }else{
+        add.push(0)
+      }
+    }
+    top10SpeedRankingData[i] = {
+      ranking: i+1,
+      uid: uid,
+      name: cutoffEventTop.getUserNameById(uid),
+      point: point,
+    }
+    add.reverse().forEach((value, index)=>{
+      top10SpeedRankingData[i][`zzzzz${index}`] = value;
+    })
+  }
+
+
+
+  const formatToHHMM = (time: number) => {
+    const date = new Date(time);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+  const filterTime = (data: {time: number,uid: number,value: number }[])=>{
+    const timeList = [];
+    for (const {time} of data){
+      if (!timeList.includes(time)){
+        timeList.push(time);
+      }
+    }
+    return timeList.slice(1).map(item => new Date(item).toTimeString().slice(0, 5));
+  }
+  //console.log(rankingInTenMinute)
+  const minuteStrs = filterTime(rankingInTenMinute)
+  const headerStringArray = ['排名', 'uid', 'id', '分数', ...minuteStrs]
+  //const headerStringArray = ['順位', 'uid', 'id', 'ポイント', '上との差', compareName ? `${compareName}さんと差` : null, `${time}時速`, '時速ランキング', '今の時間', '1hスタート時間']
+  const top10RankingTable: Canvas[][] = Array.from({ length: 10 }, () => []);
+  const drawWidth = []
+  const header: Canvas[] = [];
+  headerStringArray.forEach((value, index) => {
+    if (!value) return header.push(null);
+    header.push(drawRoundedRectWithText({ text: value, textSize: 30 }))
+  })
+  //对每一个字段进行遍历
+  Object.keys(top10SpeedRankingData[0]).forEach((value, index) => {
+    //若未指定玩家那么直接跳过
+    if (!header[index]) return;
+    //存储宽度
+    const width = [];
+    const height = [];
+    //对每一个排名进行遍历
+    for (let i = 0; i < 10; i++){
+
+      //绘制字段图并存储各个宽度
+      const img = drawList({text: String(top10SpeedRankingData[i][value] || '---') });
+      width.push(img.width);
+      height.push(img.height);
+      top10RankingTable[i].push(img);
+    }
+    const maxWid = Math.max(header[index].width,...width);
+    drawWidth.push(maxWid + 20);
+  })
+  const totalWidth = drawWidth.reduce((sum, w) => sum + w, 0);
+  const line: Canvas = drawDottedLine({
+    width: totalWidth,
+    height: 30,
+    startX: 5,
+    startY: 15,
+    endX: totalWidth - 5,
+    endY: 15,
+    radius: 2,
+    gap: 10,
+    color: "#a8a8a8"
+  })
+  //console.log(drawWidth)
+  list.push(drawListMerge(header.filter(Boolean), widthMax, false, "top", drawWidth))
+  top10RankingTable.forEach((row) => {
+    list.push(line)
+    list.push(drawListMerge(row, widthMax, true, "top", drawWidth))
+  })
+
+  all.push(drawDatablock({ list }));
+  var event = new Event(eventId);
+  all.push(await drawEventDatablock(event, [mainServer]));
+
+  let buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
+  return [buffer];
+}
+
 export async function drawTopRunningStatus(eventId: number, playerId: number, tier: number, mainServer: Server, time: number, compress: boolean){
   var event = new Event(eventId);
   var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
@@ -605,7 +730,108 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
     else
       return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
   }
-  const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time<event.endAt[mainServer])
+   const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time < event.endAt[mainServer])
+  /*const playerRating = [
+    { time: 1720794566913, value: 18443625 },
+    { time: 1720794505644, value: 18443625 },
+    { time: 1720794444406, value: 18443625 },
+    { time: 1720794383159, value: 18443625 },
+    { time: 1720794321929, value: 18443625 },
+    { time: 1720794260813, value: 18443625 },
+    { time: 1720794199573, value: 18443625 },
+    { time: 1720794138490, value: 18443625 },
+    { time: 1720794077413, value: 18443625 },
+    { time: 1720794016185, value: 18443625 },
+    { time: 1720793954943, value: 18443625 },
+    { time: 1720793893897, value: 18443625 },
+    { time: 1720793832780, value: 18443625 },
+    { time: 1720793771668, value: 18443625 },
+    { time: 1720793710613, value: 18443625 },
+    { time: 1720793649383, value: 18443625 },
+    { time: 1720793588224, value: 18443625 },
+    { time: 1720793527168, value: 18443625 },
+    { time: 1720793465875, value: 18443625 },
+    { time: 1720793404782, value: 18443625 },
+    { time: 1720793343671, value: 18443625 },
+    { time: 1720793282578, value: 18443625 },
+    { time: 1720793221476, value: 18443625 },
+    { time: 1720793160348, value: 18443625 },
+    { time: 1720793099077, value: 18443625 },
+    { time: 1720793038015, value: 18443625 },
+    { time: 1720792976936, value: 18414465 },
+    { time: 1720792915877, value: 18414465 },
+    { time: 1720792854627, value: 18414465 },
+    { time: 1720792793532, value: 18414465 },
+    { time: 1720792732482, value: 18414465 },
+    { time: 1720792671418, value: 18414465 },
+    { time: 1720792610172, value: 18385350 },
+    { time: 1720792548889, value: 18385350 },
+    { time: 1720792487805, value: 18385350 },
+    { time: 1720792426681, value: 18385350 },
+    { time: 1720792365460, value: 18385350 },
+    { time: 1720792304348, value: 18355740 },
+    { time: 1720792243249, value: 18355740 },
+    { time: 1720792182173, value: 18355740 },
+    { time: 1720792120936, value: 18355740 },
+    { time: 1720792059680, value: 18355740 },
+    { time: 1720791998422, value: 18355740 },
+    { time: 1720791937127, value: 18326490 },
+    { time: 1720791876010, value: 18326490 },
+    { time: 1720791814945, value: 18326490 },
+    { time: 1720791753871, value: 18326490 },
+    { time: 1720791692640, value: 18326490 },
+    { time: 1720791631562, value: 18326490 },
+    { time: 1720791570483, value: 18296970 },
+    { time: 1720791509263, value: 18296970 },
+    { time: 1720791448017, value: 18296970 },
+    { time: 1720791386599, value: 18296970 },
+    { time: 1720791325508, value: 18296970 },
+    { time: 1720791264440, value: 18296970 },
+    { time: 1720791203187, value: 18267360 },
+    { time: 1720791141955, value: 18267360 },
+    { time: 1720791080900, value: 18267360 },
+    { time: 1720791019846, value: 18267360 },
+    { time: 1720790958604, value: 18267360 },
+    { time: 1720790897372, value: 18267360 },
+    { time: 1720790836291, value: 18236850 },
+    { time: 1720790775238, value: 18236850 },
+    { time: 1720790714189, value: 18236850 },
+    { time: 1720790653115, value: 18236850 },
+    { time: 1720790591895, value: 18236850 },
+    { time: 1720790530813, value: 18207150 },
+    { time: 1720790469581, value: 18207150 },
+    { time: 1720790408330, value: 18207150 },
+    { time: 1720790347235, value: 18207150 },
+    { time: 1720790286008, value: 18207150 },
+    { time: 1720790224745, value: 18207150 },
+    { time: 1720790163474, value: 18175650 },
+    { time: 1720790102075, value: 18175650 },
+    { time: 1720790040904, value: 18175650 },
+    { time: 1720789979802, value: 18175650 },
+    { time: 1720789918727, value: 18175650 },
+    { time: 1720789857665, value: 18175650 },
+    { time: 1720789796560, value: 18152880 },
+    { time: 1720789735459, value: 18152880 },
+    { time: 1720789674068, value: 18152880 },
+    { time: 1720789612983, value: 18152880 },
+    { time: 1720789551787, value: 18152880 },
+    { time: 1720789490535, value: 18152880 },
+    { time: 1720789429266, value: 18152880 },
+    { time: 1720789367996, value: 18152880 },
+    { time: 1720789306987, value: 18152880 },
+    { time: 1720789245891, value: 18152880 },
+    { time: 1720789184609, value: 18152880 },
+    { time: 1720789123514, value: 18152880 },
+    { time: 1720789062337, value: 18152880 },
+    { time: 1720789001182, value: 18152880 },
+    { time: 1720788939930, value: 18152880 },
+    { time: 1720788878798, value: 18152880 }
+  ]*/
+
+  console.log(playerRating.filter(item =>
+    item.time > new Date(2024,6,18,22,0,0,0).getTime() &&
+    item.time < new Date(2024,6,18,23,0,0,0).getTime()
+  ));
   const list = [];
   list.push(drawListMerge([
     drawList({ key: '日期' }),
@@ -622,7 +848,49 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
   let lastValue: number | null = null;
   let tmpTimes: number = 0;
   let lastActiveTime: number | null = null;
-  for (let i = playerRating.length - 1; i >= 0; i--) {
+  let flag = false;
+  for (let i = playerRating.length - 1; i >=0; i--){
+    const {time,value} = playerRating[i];
+    if (value === -1 || i === 0){
+      if (flag){
+        if (tmpTimes>0)
+          run.push({
+            startTime,startValue,endTime:lastActiveTime,endValue:lastValue,playTimes:tmpTimes
+          })
+        startTime = null;
+        startValue = null;
+        lastValue = null;
+        tmpTimes = 0;
+        lastActiveTime = null;
+        flag = false;
+      }
+      continue;
+    }
+    if (value === lastValue)continue;
+    if (value !== lastValue){
+      if (!flag){
+        startTime = time;
+        startValue = value;
+        tmpTimes = -1;
+      }else
+      //检查停车时间
+      if (time - lastActiveTime > limitTime){
+        if (tmpTimes>0)
+          run.push({
+            startTime,startValue,endTime:lastActiveTime,endValue:lastValue,playTimes:tmpTimes
+          })
+        //检测bd防炸
+        startTime = time;
+        startValue = time - playerRating[i+1]?.time > 5*60*1000? value: lastValue;
+        tmpTimes = 0;
+      }
+      tmpTimes++;
+      lastValue = value;
+      lastActiveTime = time;
+      flag = true;
+    }
+  }
+  /*for (let i = playerRating.length - 1; i >= 0; i--) {
     const {time, value} = playerRating[i];
     if (value === -1 || i == 0){
       //结束上一个
@@ -670,12 +938,12 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
       tmpTimes++;
 
     }
-  }
+  }*/
 
   const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time%60}min`
   if (run.length > 0) {
     let totalRunTime = 0;
-    console.log(run)
+    //console.log(run)
     for (const { startTime, startValue, endTime, endValue, playTimes} of run) {
       const st = new Date(startTime), ed = new Date(endTime)
       const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
@@ -714,7 +982,10 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
   }else {
     list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
   }
+  //折线图
+  list.push(await drawCutOffEventTopSingleChart(cutoffEventTop,false,playerId,mainServer))
   all.push(drawDatablock({ list, topLeftText: `稼动时间统计`}))
+
 
   all.push(await drawEventDatablock(event, [mainServer]));
   var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
@@ -784,11 +1055,6 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
     })
   })
   return top10_ranking;
-
-
-
-
-
 }
 
 export function getAverageTime(timestamps: Array<number>) {
@@ -859,4 +1125,61 @@ function computeSpeed(
   }
   return speed;
 }
+/*
+
+function getSpeedData(setStartToZero = false, event: Event, mainServer: Server, points: { time: number, value: any }[]):{x:Date,y:number}[]{
+  const hour = 60 * 60 * 1000;
+
+  let thisHour = event.startAt[mainServer];
+  let speed: {time: number, value: number}[] = []
+  let startValue = null;
+  let endValue = null;
+  let tmpTime = 0;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const element = points[i];
+    if (element.time - thisHour >= hour){
+      if (startValue > 0 && endValue > 0){
+        speed.push({time: thisHour, value: tmpTime == 0 ? 0 : (endValue - startValue) / tmpTime})
+        //speed.push({time: thisHour, value: (endValue - startValue)})
+        //console.log({startValue, endValue, tmpTime})
+      }
+      if (element.value > 0){
+        startValue = endValue
+        endValue = element.value
+      }else{
+        startValue = null;
+        endValue = null;
+      }
+      thisHour += hour;
+      tmpTime = 0;
+    }
+    if (element.value > 0){
+      if (!startValue){
+        startValue = element.value;
+      }
+      if (element.value > endValue){
+        tmpTime ++;
+      }
+      endValue = element.value;
+
+    }
+
+  }
+  //console.log(speed)
+  var chartDate:{x:Date,y:number}[] = [];
+  for(let i =0;i<speed.length;i++){
+    const element = speed[i]
+    if(setStartToZero){
+      //chartDate.push({x:new Date(0),y:0});
+      chartDate.push({x:new Date(element.time-speed.at(-1).time),y:element.value});
+    }
+    else{
+      //chartDate.push({x:new Date(points.at(-1).time),y:0});
+      chartDate.push({x:new Date(element.time),y:element.value});
+    }
+  }
+  //console.log(chartDate);
+  return chartDate;
+}
+*/
 
