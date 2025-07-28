@@ -145,3 +145,32 @@ export async function drawCutoffEventTopChart(CutoffEventTop: CutoffEventTop, se
     var data = { datasets: datasets }
     return await drawTimeLineChart({ data, start: new Date(CutoffEventTop.startAt), end: new Date(CutoffEventTop.endAt), setStartToZero }, true)
 }
+export async function drawCutOffEventTopSingleChart(CutoffEventTop: CutoffEventTop, setStartToZero = false, playerUid: number, server: Server = Server['jp']){
+  var datasets = []
+  if (CutoffEventTop == undefined) {
+    return (new Canvas(1, 1))
+  }
+  var allData = CutoffEventTop.getChartData()[playerUid];
+  function removeBraces(text: string): string {
+    var newText = text.replace(/\[[^\]]*\]/g, "");
+    return newText;
+  }
+  let colorNumber = 0
+
+  const tempColor = getPresetColor(colorNumber)
+  datasets.push({
+    label: removeBraces(CutoffEventTop.getUserNameById(Number(playerUid))),
+    data: allData,
+    borderWidth: 4,
+    borderColor: [tempColor.getRGBA(1)],
+    backgroundColor: [tempColor.getRGBA(0.2)],
+    pointBackgroundColor: tempColor.getRGBA(0),
+    pointBorderColor: tempColor.getRGBA(0),
+    pointStyle: false,
+    fill: false
+  })
+  colorNumber++
+
+  var data = { datasets: datasets }
+  return await drawTimeLineChart({ data, start: new Date(CutoffEventTop.startAt), end: new Date(CutoffEventTop.endAt), setStartToZero }, true)
+}
