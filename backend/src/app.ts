@@ -25,6 +25,7 @@ import { topRateDetailRouter } from './routers/topRateDetail';
 import { topRateRankingRouter } from './routers/topRateRanking';
 import { topSleepStatRouter } from "@/routers/topSleepStat";
 import { topRunningStatusRouter } from "@/routers/topRunningStatus";
+import { topTenMinuteSpeedRouter } from "@/routers/topTenMinuteSpeed";
 import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
@@ -51,16 +52,17 @@ app.use('/songMeta', songMetaRouter);
 app.use('/songChart', songChartRouter);
 app.use('/cutoffDetail', cutoffDetailRouter);
 app.use('/cutoffListOfRecentEvent', cutoffListOfRecentEventRouter);
-app.use('/cutoffAll', cutoffAllRouter)
-app.use('/eventStage', eventStageRouter)
+app.use('/cutoffAll', cutoffAllRouter);
+app.use('/eventStage', eventStageRouter);
 app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);
 app.use('/medleyCal', medleyCalRouter);
 app.use('/topRateDetail', topRateDetailRouter);
-app.use('/topRateRanking', topRateRankingRouter)
-app.use('/topSleepStat', topSleepStatRouter)
-app.use('/topRunningStatus', topRunningStatusRouter)
-app.use('/searchComposition', searchCompositionRouter)
+app.use('/topRateRanking', topRateRankingRouter);
+app.use('/topTenMinuteSpeed', topTenMinuteSpeedRouter);
+app.use('/topSleepStat', topSleepStatRouter);
+app.use('/topRunningStatus', topRunningStatusRouter);
+app.use('/searchComposition', searchCompositionRouter);
 
 // console.log(process.env)
 if (process.env.LOCAL_DB == 'true') {

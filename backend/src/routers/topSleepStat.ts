@@ -1,4 +1,3 @@
-import { drawCutoffDetail } from '@/view/cutoffDetail';
 import { Server, getServerByServerId } from '@/types/Server';
 import { getPresentEvent } from '@/types/Event';
 import { listToBase64 } from '@/routers/utils';
