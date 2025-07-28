@@ -13,11 +13,24 @@ import { commandCharacter } from './commands/searchCharacter'
 import { commandSongMeta } from './commands/songMeta'
 import { roomNumber } from './commands/roomNumber'
 import { commandRoomList } from './commands/roomList'
-import { commandBindPlayer, commandPlayerInfo, commandSwitchDisplayedServerList, commandSwitchServerMode, commandUnbindPlayer, commandSwitchShareRoomNumberMode, commandPlayerList, commandSwitchPlayerIndex } from './commands/user'
+import {
+  commandBindPlayer,
+  commandPlayerInfo,
+  commandSwitchDisplayedServerList,
+  commandSwitchServerMode,
+  commandUnbindPlayer,
+  commandSwitchShareRoomNumberMode,
+  commandPlayerList,
+  commandSwitchPlayerIndex
+} from './commands/user'
 import { commandSongChart, commandCommunitySongChart } from './commands/songChart'
 import { commandEventStage } from './commands/eventStage'
 import { commandSongRandom } from './commands/songRandom'
 import { commandTopRateDetail } from './commands/topRateDetail'
+import { commandTopRateRanking } from "./commands/topRateRanking";
+import { commandTopSleepStat } from "./commands/topSleepStat";
+import { commandTopRunningStatus } from "./commands/topRunningStatus";
+import { commandTopTenMinuteSpeed } from "./commands/topTenMinuteSpeed";
 import { Server } from './types/Server'
 import { globalDefaultServer, tsuguUser } from './config'
 import { tierListOfServerToString, checkLeftDigits, paresMessageList, stringArrayToNumberArray } from './utils'
@@ -25,9 +38,7 @@ import { getRemoteDBUserData } from './api/remoteDB'
 import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySearch'
 import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
-import {commandTopRateRanking} from "./commands/topRateRanking";
-import {commandTopSleepStat} from "./commands/topSleepStat";
-import {commandTopRunningStatus} from "./commands/topRunningStatus";
+
 
 export const name = 'tsugu-bangdream-bot';
 export const inject = ['database'];
@@ -385,7 +396,23 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandTopRateRanking(config, mainServer, time, compareTier, comparePlayerUid)
       return (paresMessageList(list))
     })
+  ctx.command('十分速度 [serverName:string]')
+    .alias('十分表')
+    .action(async ({ session }, serverName) => {
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      const list = await commandTopTenMinuteSpeed(config, mainServer)
+      return (paresMessageList(list))
+    })
   ctx.command('查稼动 <playerId:string> [eventId] [serverName:string]')
+    .alias('查稼働')
     .option('time', '-t <time:number> 指定时间边界，默认25(单位min)')
     .action(async ({ session, options }, playerId, eventId, serverName) => {
       if (playerId == undefined) {
