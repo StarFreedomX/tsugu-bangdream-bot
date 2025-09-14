@@ -490,7 +490,7 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
   return [buffer];
 }
 
-export async function drawTopRateRanking(eventId: number, mainServer: Server, compress: boolean, time: number, compareTier: number, comparePlayerUid: number) {
+export async function drawTopRateRanking(eventId: number, mainServer: Server, compress: boolean, time: number, date:Date, compareTier: number, comparePlayerUid: number) {
   const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
   await cutoffEventTop.initFull(0);
   if (!cutoffEventTop.isExist) {
@@ -502,12 +502,15 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
   if (compareTier && !(Number.isInteger(compareTier) && compareTier >= 1 && compareTier <= 10)){
     return [`错误: 档位${compareTier}不存在`]
   }
+  if (date && (date.getTime() < cutoffEventTop.startAt || date.getTime() > cutoffEventTop.endAt)) {
+    return [`错误: ${date.toLocaleString()}不在当前活动时间内`]
+  }
 
   const all = [];
   const widthMax = 3000;
   all.push(drawTitle('t10时速排名', `${serverNameFullList[mainServer]}`));
   let list = []
-  const top10SpeedRankingData = getTopRatingDuringTime(cutoffEventTop, time, compareTier, comparePlayerUid);
+  const top10SpeedRankingData = getTopRatingDuringTime(cutoffEventTop, time, date, compareTier, comparePlayerUid);
   const compareName = compareTier ? cutoffEventTop.getUserNameById(cutoffEventTop.getLatestRanking()[compareTier-1].uid) : (comparePlayerUid ? cutoffEventTop.getUserNameById(comparePlayerUid) : null);
   const headerStringArray = ['排名', 'uid', 'id', '分数', '分差', compareName ? `与${compareName}分差` : null, `${time}min分数变化`, '速度排名', '当前数据获取时间', '上次数据获取时间']
   //const headerStringArray = ['順位', 'uid', 'id', 'ポイント', '上との差', compareName ? `${compareName}さんと差` : null, `${time}時速`, '時速ランキング', '今の時間', '1hスタート時間']
@@ -1015,10 +1018,13 @@ export function getRatingByPlayer(points: Array<{
     })
 }
 
-export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 60, compareTier: number, comparePlayerUid: number) {
-  const now = cutoffEventTop.points.at(-1).time;
-  const top10List: {uid: number, point: number}[] = cutoffEventTop.getLatestRanking();
-  const top10_Old: {time: number, uid: number, value: number}[] = findTargetTimeRankingGroup(cutoffEventTop.points,now - windowTimeLimit * 60 * 1000);
+export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
+  const limitPoints = date ? cutoffEventTop.points.filter(item => item.time <= date.getTime()) : cutoffEventTop.points;
+  //console.log(limitPoints, date)
+  const now = limitPoints.at(-1).time;
+  //const top10List: {uid: number, point: number}[] = cutoffEventTop.getLatestRanking();
+  const top10List: {uid: number, point: number}[] = limitPoints.slice(-10).map(({uid, value})=>({uid, point:value}));
+  const top10_Old: {time: number, uid: number, value: number}[] = findTargetTimeRankingGroup(limitPoints,now - windowTimeLimit * 60 * 1000);
   const old_time = top10_Old?.[0]?.time;
   const top10_ranking: {
     ranking: number,
@@ -1084,7 +1090,8 @@ function findTargetTimeRankingGroup(
     }
   }
 
-  if (index === -1) return [];
+  // 如果没找到，则使用最小的那个
+  if (index === -1) index = 0;
 
   const groupTime = sorted[index].time;
 
@@ -1102,6 +1109,7 @@ function findTargetTimeRankingGroup(
 
   return sorted.slice(start, end + 1);
 }
+
 
 function computeSpeed(
   top10List: { uid: number; point: number }[],
