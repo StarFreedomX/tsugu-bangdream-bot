@@ -302,6 +302,7 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSearchPlayer(config, playerId, mainServer)
       return (paresMessageList(list))
     })
+
   ctx.command('查岗 <playerId:string> [eventId] [serverName:string]', '查询前十车速', cmdConfig)
     .option('count', '-c <count:number> 指定显示最近的几次分数变化，默认20次')
     .action(async ({ session, options }, playerId, eventId, serverName) => {
@@ -339,39 +340,59 @@ export function apply(ctx: Context, config: Config) {
     })
 
   ctx.command('前十车速 [commandArgs:text]', '查询当前前十车速排名', cmdConfig)
-    .option('time', '-t <time:number> 指定时间范围，默认60(单位min)')
+    .option('length', '-l <length:string> 指定时间范围，默认60(单位min)')
+    .option('time', '-t <time:number> 指定结束统计的整点时刻')
+    .option('date', '-d <date:string> 指定结束统计日期，格式为"年/月/日"或"月/日"(分隔符用.也可)')
     .option('player', '-p <player:string> 指定玩家')
     .action(async ({ session, options }, commandArgs) => {
-      //识别时间，格式为纯数字/数字min/数字h/数字m
-      const isTime = (s: string) => (/^\d+$/.test(s) ? +s <= 10000 && +s > 10 : /^\d+(min|h|m)$/i.test(s))
-      //识别player，格式为纯数字/t数字/p数字
-      const isPlayer = (s: string) => (/^\d+$/.test(s) ? (+s > 10000 || (+s > 0 && +s <= 10)) : /^t([1-9]|10)$/i.test(s) || /^p\d+$/i.test(s))
+      //识别时间，格式为数字min/数字h/数字m
       const parseTimeToMinutes = (timeStr: string): number => {
         const m = timeStr.toLowerCase().match(/^(\d+)(min|h|m)?$/)
         return m ? parseFloat(m[1]) * (m[2] === 'h' ? 60 : 1): undefined;
       }
+      function parseDate(str: string): Date | undefined {
+        const m = str.match(/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/);
+        if (!m) return;
+        if (m[1]) return new Date(+m[1], +m[2] - 1, +m[3]);
+        const now = new Date();
+        const d = new Date(now.getFullYear(), +m[4] - 1, +m[5]);
+        const limit = new Date(now); limit.setMonth(now.getMonth() + 1);
+        return d > limit ? new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()) : d;
+      }
+
+      //识别player，格式为t数字/p数字
+      const isPlayer = (s: string) => (/^t([1-9]|10)$/i.test(s) || /^p\d+$/i.test(s))
+      const isHour = (s: string) => (/^(?:[0-9]|1[0-9]|2[0-4])$/.test(s))
+      const isDate = (s: string) => (/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/.test(s))
+      const isTimeRange = (s: string) => (/^\d+(min|h|m)?$/i.test(s))
+
       let player = options?.player;
-      let time = options?.time;
+      let length = isTimeRange(options?.length) ? parseTimeToMinutes(options.length) : undefined;
+      let timeHour = options.time;
+      let date = isDate(options?.date) ? parseDate(options.date) : undefined;
       let serverName = undefined;
+
       if (commandArgs?.length)
-        for (const arg of commandArgs?.trim()?.split(/\s+/g)){
-          if (isTime(arg)) {
-            time ??= parseTimeToMinutes(arg);
-          }else if (isPlayer(arg)){
-            const turnT = (arg: string) => {
-              if(/^\d+$/.test(arg)) {
-                const num = parseInt(arg);
-                if (num >= 1 && num <= 10) {
-                  return `t${num}`;
-                }
-              }
-              return arg;
-            }
-            player ??= turnT(arg).replace(/^p/i, '');
+        for (const arg of commandArgs?.trim()?.split(/\s+/g)) {
+          if (isPlayer(arg)) { //玩家
+            player ??= arg.replace(/^p/i, '');
+          } else if (isHour(arg)) {
+            timeHour ??= Number(arg)
+          }else if(isDate(arg)) {
+            date ??= parseDate(arg)
+          }else if(isTimeRange(arg)){
+            length ??= parseTimeToMinutes(arg)
           }else if (!/\d/.test(arg)){
             serverName ??= arg;
           }
         }
+      if (timeHour){
+        if (date) date.setHours(timeHour);
+        else {
+          const now = new Date()
+          date = new Date(now.getFullYear(),now.getMonth(),now.getDate(),timeHour,0,0,0);
+        }
+      }
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -390,12 +411,15 @@ export function apply(ctx: Context, config: Config) {
       }else if(player){
         comparePlayerUid = Number(player);
       }
-      if (time && !/^[0-9]+$/.test(String(time))){
-        return '参数time输入无效，请指定时间长度(分钟)';
+      length ??= 60;
+      if (length && !/^[0-9]+$/.test(String(length))){
+        return '参数time输入无效，请指定时间长度(默认min)';
       }
-      const list = await commandTopRateRanking(config, mainServer, time, compareTier, comparePlayerUid)
+      //console.log(date)
+      const list = await commandTopRateRanking(config, mainServer, length, date, compareTier, comparePlayerUid)
       return (paresMessageList(list))
     })
+
   ctx.command('十分速度 [serverName:string]')
     .alias('十分表')
     .action(async ({ session }, serverName) => {
