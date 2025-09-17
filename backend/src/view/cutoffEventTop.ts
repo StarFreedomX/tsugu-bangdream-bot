@@ -55,7 +55,7 @@ export async function drawCutoffEventTop(eventId: number, mainServer: Server, co
     return [buffer];
 }
 
-export async function drawTopRateDetail(eventId: number, playerId: number, tier: number, maxCount: number, mainServer: Server, compress: boolean): Promise<Array<Buffer | string>> {
+export async function drawTopRateDetail(eventId: number, playerId: number, tier: number, day: number, limit: string, maxCount: number, mainServer: Server, compress: boolean): Promise<Array<Buffer | string>> {
     var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
     await cutoffEventTop.initFull(0);
     if (!cutoffEventTop.isExist) {
@@ -64,6 +64,52 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     //if (cutoffEventTop.status != "in_progress") {
         //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
     //}
+    if (day){
+      const targetDay = cutoffEventTop.startAt + (day-1) * 24 * 3600 * 1000;
+      if (targetDay < cutoffEventTop.startAt || targetDay > cutoffEventTop.endAt){
+        return [`错误: ${serverNameFullList[mainServer]} d${day}不在活动时间内`];
+      }
+      const dayStart = new Date(targetDay)
+      dayStart.setHours(0);
+      const dayStartAt = dayStart.getTime();
+      const dayEnd = new Date(targetDay)
+      dayEnd.setHours(24);
+      const dayEndAt = dayEnd.getTime();
+      cutoffEventTop.points = cutoffEventTop.points.filter(point => (point.time > dayStartAt && point.time < dayEndAt));
+    }
+
+    function parseLimit(limit?: string): { min: number; max: number } {
+      // 默认值
+      let min = 0;
+      let max = Infinity;
+      if (!limit || typeof limit !== "string") {
+        return { min, max };
+      }
+      let str = limit.trim()
+        .replace(/＞/g, ">")
+        .replace(/＜/g, "<")
+        .replace(/＝/g, "=");
+      // 匹配 ">N"
+      if (/^>\d+$/.test(str)) min = Number(str.slice(1))+1;
+      // 匹配 "<N"
+      if (/^<\d+$/.test(str)) max = Number(str.slice(1))-1;
+      // 匹配 ">=N"
+      if (/^>=\d+$/.test(str)) min = Number(str.slice(1));
+      // 匹配 "<=N"
+      if (/^<=\d+$/.test(str)) max = Number(str.slice(1));
+      // 匹配 "A-B"
+      if (/^\d+-\d+$/.test(str)) {
+        const [a, b] = str.split("-").map(Number);
+        if (a <= b) {
+          min = a;
+          max = b;
+        }
+      }
+      // 其他不合法输入 → 默认值
+      return { min, max };
+    }
+
+
 
     var all = [];
     const widthMax = 1000, line: Canvas = drawDottedLine({
@@ -107,6 +153,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     //最近maxCount次分数变化
     {
         const list = [], imageList = []
+        const { min, max } = parseLimit(limit);
         let count = 0
         if (!maxCount) {
             maxCount = 20
@@ -127,12 +174,13 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             if (playerRating[i + 1].value == -1) {
                 break
             }
-            if (count == maxCount) {
+            if (!day && count == maxCount) {
                 break
             }
             if (playerRating[i].value != playerRating[i + 1].value) {
-                count += 1
                 const mid = new Date((playerRating[i + 1].time + playerRating[i].time) / 2), score = playerRating[i].value - playerRating[i + 1].value
+                if (score > max || score < min ) continue;
+                count += 1
                 imageList.push(drawListMerge([drawList({ text: `${mid.toTimeString().slice(0, 5)}`}), drawList({ text: `${score}`})], widthMax / 2))
                 // list.push(line)
             }
@@ -160,17 +208,23 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     }
     //CP活cp情况统计
     const nowEvent = new Event(eventId);
-    if (nowEvent.eventType === 'challenge') {
+    if (nowEvent.eventType === 'challenge' && !limit) {
       const cpLists = [];
       let multiPlayTimes = 0;
       let multiPlayCPs = 0;
       let challengePlayTimes = 0;
       let changeCPs = 0;
 
-      const extendedRating = [...playerRating, {
+      const extendedRating = day ? playerRating : [...playerRating, {
+        time: nowEvent.startAt[mainServer]+1,
+        value: -1
+      },{
         time: nowEvent.startAt[mainServer],
         value: 0
       }];
+
+
+      //console.log(extendedRating.slice(-50))
 
       let livePoint = [];
       let cpPoints = []
@@ -186,6 +240,9 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         while (j < extendedRating.length) {
           if (extendedRating[j].value === -1) {
             crossedSeparator = true
+          }else if (extendedRating[j].time - extendedRating[j-1].time > 300*1000){
+            crossedSeparator = true;
+            if (extendedRating[j].value >= 0) break;
           }else if (extendedRating[j].value >= 0) break
           j++
         }
@@ -199,12 +256,12 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         if (diff === 0) continue
 
         if (crossedSeparator) {
-          const timesPerHour = 26
-          //跨越-1(出现中断点，需合理分配协力和清理cp)
+          const timesPerHour = 28
+          //跨越-1/bd炸了(出现中断点，需合理分配协力和清理cp)
           const avgLivePoints = (avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint) || avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints)/8 || 11000);
           const avgCPPoints = (avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints) || avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint)*8 || 85000);
           const crossHour = (current.time - next.time) / (1000 * 60 * 60)
-          const sleepTime = crossHour/8
+          const sleepTime = crossHour > 12 ? crossHour/8 : 0
           const diffHour = crossHour - sleepTime;
           const multiPlaySpeed = avgLivePoints * timesPerHour;
           const cpPlaySpeed = avgCPPoints * timesPerHour;
@@ -249,9 +306,11 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             const addCPs = Math.ceil(a * t_1 / avgLivePoints * Math.ceil(avgLivePoints / 20)) - t_2 * timesPerHour * 1600;
             multiPlayCPs += addCPs //Math.ceil(a * t_1 / 20);
             changeCPs += addCPs //Math.ceil(a * t_1 / 20) - t_2 * timesPerHour * 1600;
-            /*console.log('avgLivePoints ',avgLivePoints,
-              '\navgCPPoints ', avgCPPoin
-              ts,
+            console.log(
+              '开始时间 ', new Date(next.time).toLocaleString(),
+              '\n结束时间 ', new Date(current.time).toLocaleString(),
+              '\navgLivePoints ',avgLivePoints,
+              '\navgCPPoints ', avgCPPoints,
               '\naddMultiPlayHour ', t_1,
               '\naddCPPlayHour ', t_2,
               '\nmultiPlaySpeed ',multiPlaySpeed,
@@ -260,7 +319,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
               '\n- ',t_2 * 26 * 1600,
               '\ncpPoints', cpPoints,
               '\nlivePoint', livePoint,
-              '\n-----------------------------')*/
+              '\n-----------------------------')
           }
         } else if (diff > 50000) {
           challengePlayTimes += 1;
@@ -610,6 +669,7 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
       point: point,
     }
     add.reverse().forEach((value, index)=>{
+      //这里的z是为了确保顺序放的
       top10SpeedRankingData[i][`zzzzz${index}`] = value;
     })
   }
@@ -734,102 +794,7 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
       return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
   }
    const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId).filter(item => item.time < event.endAt[mainServer])
-  /*const playerRating = [
-    { time: 1720794566913, value: 18443625 },
-    { time: 1720794505644, value: 18443625 },
-    { time: 1720794444406, value: 18443625 },
-    { time: 1720794383159, value: 18443625 },
-    { time: 1720794321929, value: 18443625 },
-    { time: 1720794260813, value: 18443625 },
-    { time: 1720794199573, value: 18443625 },
-    { time: 1720794138490, value: 18443625 },
-    { time: 1720794077413, value: 18443625 },
-    { time: 1720794016185, value: 18443625 },
-    { time: 1720793954943, value: 18443625 },
-    { time: 1720793893897, value: 18443625 },
-    { time: 1720793832780, value: 18443625 },
-    { time: 1720793771668, value: 18443625 },
-    { time: 1720793710613, value: 18443625 },
-    { time: 1720793649383, value: 18443625 },
-    { time: 1720793588224, value: 18443625 },
-    { time: 1720793527168, value: 18443625 },
-    { time: 1720793465875, value: 18443625 },
-    { time: 1720793404782, value: 18443625 },
-    { time: 1720793343671, value: 18443625 },
-    { time: 1720793282578, value: 18443625 },
-    { time: 1720793221476, value: 18443625 },
-    { time: 1720793160348, value: 18443625 },
-    { time: 1720793099077, value: 18443625 },
-    { time: 1720793038015, value: 18443625 },
-    { time: 1720792976936, value: 18414465 },
-    { time: 1720792915877, value: 18414465 },
-    { time: 1720792854627, value: 18414465 },
-    { time: 1720792793532, value: 18414465 },
-    { time: 1720792732482, value: 18414465 },
-    { time: 1720792671418, value: 18414465 },
-    { time: 1720792610172, value: 18385350 },
-    { time: 1720792548889, value: 18385350 },
-    { time: 1720792487805, value: 18385350 },
-    { time: 1720792426681, value: 18385350 },
-    { time: 1720792365460, value: 18385350 },
-    { time: 1720792304348, value: 18355740 },
-    { time: 1720792243249, value: 18355740 },
-    { time: 1720792182173, value: 18355740 },
-    { time: 1720792120936, value: 18355740 },
-    { time: 1720792059680, value: 18355740 },
-    { time: 1720791998422, value: 18355740 },
-    { time: 1720791937127, value: 18326490 },
-    { time: 1720791876010, value: 18326490 },
-    { time: 1720791814945, value: 18326490 },
-    { time: 1720791753871, value: 18326490 },
-    { time: 1720791692640, value: 18326490 },
-    { time: 1720791631562, value: 18326490 },
-    { time: 1720791570483, value: 18296970 },
-    { time: 1720791509263, value: 18296970 },
-    { time: 1720791448017, value: 18296970 },
-    { time: 1720791386599, value: 18296970 },
-    { time: 1720791325508, value: 18296970 },
-    { time: 1720791264440, value: 18296970 },
-    { time: 1720791203187, value: 18267360 },
-    { time: 1720791141955, value: 18267360 },
-    { time: 1720791080900, value: 18267360 },
-    { time: 1720791019846, value: 18267360 },
-    { time: 1720790958604, value: 18267360 },
-    { time: 1720790897372, value: 18267360 },
-    { time: 1720790836291, value: 18236850 },
-    { time: 1720790775238, value: 18236850 },
-    { time: 1720790714189, value: 18236850 },
-    { time: 1720790653115, value: 18236850 },
-    { time: 1720790591895, value: 18236850 },
-    { time: 1720790530813, value: 18207150 },
-    { time: 1720790469581, value: 18207150 },
-    { time: 1720790408330, value: 18207150 },
-    { time: 1720790347235, value: 18207150 },
-    { time: 1720790286008, value: 18207150 },
-    { time: 1720790224745, value: 18207150 },
-    { time: 1720790163474, value: 18175650 },
-    { time: 1720790102075, value: 18175650 },
-    { time: 1720790040904, value: 18175650 },
-    { time: 1720789979802, value: 18175650 },
-    { time: 1720789918727, value: 18175650 },
-    { time: 1720789857665, value: 18175650 },
-    { time: 1720789796560, value: 18152880 },
-    { time: 1720789735459, value: 18152880 },
-    { time: 1720789674068, value: 18152880 },
-    { time: 1720789612983, value: 18152880 },
-    { time: 1720789551787, value: 18152880 },
-    { time: 1720789490535, value: 18152880 },
-    { time: 1720789429266, value: 18152880 },
-    { time: 1720789367996, value: 18152880 },
-    { time: 1720789306987, value: 18152880 },
-    { time: 1720789245891, value: 18152880 },
-    { time: 1720789184609, value: 18152880 },
-    { time: 1720789123514, value: 18152880 },
-    { time: 1720789062337, value: 18152880 },
-    { time: 1720789001182, value: 18152880 },
-    { time: 1720788939930, value: 18152880 },
-    { time: 1720788878798, value: 18152880 }
-  ]*/
+
 
   console.log(playerRating.filter(item =>
     item.time > new Date(2024,6,18,22,0,0,0).getTime() &&
