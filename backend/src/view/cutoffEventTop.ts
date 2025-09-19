@@ -64,6 +64,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
     //if (cutoffEventTop.status != "in_progress") {
         //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
     //}
+    const finalRanking = cutoffEventTop.getLatestRanking();
     if (day){
       const targetDay = cutoffEventTop.startAt + (day-1) * 24 * 3600 * 1000;
       if (targetDay < cutoffEventTop.startAt || targetDay > cutoffEventTop.endAt){
@@ -131,7 +132,8 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         //名片
         var event = new Event(eventId);
         all.push(await drawEventDatablock(event, [mainServer]));
-        var userInRankings = cutoffEventTop.getLatestRanking();
+        //var userInRankings = cutoffEventTop.getLatestRanking();
+        var userInRankings = finalRanking;
         for (let i = 0; i < userInRankings.length; i++) {
             if (playerId && userInRankings[i].uid != playerId || tier && tier != i + 1) {
                 continue
@@ -181,7 +183,13 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
                 const mid = new Date((playerRating[i + 1].time + playerRating[i].time) / 2), score = playerRating[i].value - playerRating[i + 1].value
                 if (score > max || score < min ) continue;
                 count += 1
-                imageList.push(drawListMerge([drawList({ text: `${mid.toTimeString().slice(0, 5)}`}), drawList({ text: `${score}`})], widthMax / 2))
+                const timeImage = drawList({ text: `${mid.toTimeString().slice(0, 5)}`})
+                const ctx = timeImage.getContext('2d')
+                ctx.font = "18px old,Microsoft Yahei"
+                ctx.fillText(`${mid.getMonth()+1}.${mid.getDate()}`, 50, 13)
+                imageList.push(drawListMerge([
+                  timeImage,
+                  drawList({ text: `${score}`})], widthMax / 2))
                 // list.push(line)
             }
         }
@@ -204,7 +212,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
                 rightImage.pop()
             list.push(drawListMerge([stackImage(leftImage), stackImage(rightImage)], widthMax))
         }
-        all.push(drawDatablock({ list, topLeftText: `最近${maxCount}次分数变化`}))
+        all.push(drawDatablock({ list, topLeftText: day ? `玩家于day${day}的分数变化` : `最近${maxCount}次分数变化`}))
     }
     //CP活cp情况统计
     const nowEvent = new Event(eventId);
@@ -306,7 +314,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             const addCPs = Math.ceil(a * t_1 / avgLivePoints * Math.ceil(avgLivePoints / 20)) - t_2 * timesPerHour * 1600;
             multiPlayCPs += addCPs //Math.ceil(a * t_1 / 20);
             changeCPs += addCPs //Math.ceil(a * t_1 / 20) - t_2 * timesPerHour * 1600;
-            console.log(
+            /*console.log(
               '开始时间 ', new Date(next.time).toLocaleString(),
               '\n结束时间 ', new Date(current.time).toLocaleString(),
               '\navgLivePoints ',avgLivePoints,
@@ -319,7 +327,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
               '\n- ',t_2 * 26 * 1600,
               '\ncpPoints', cpPoints,
               '\nlivePoint', livePoint,
-              '\n-----------------------------')
+              '\n-----------------------------')*/
           }
         } else if (diff > 50000) {
           challengePlayTimes += 1;
