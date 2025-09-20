@@ -549,6 +549,8 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
   }else {
     list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
   }
+  //折线图
+  list.push(await drawCutOffEventTopSingleChart(cutoffEventTop,false,playerId,mainServer))
   all.push(drawDatablock({ list, topLeftText: `休息时间统计`}))
 
   all.push(await drawEventDatablock(event, [mainServer]));
