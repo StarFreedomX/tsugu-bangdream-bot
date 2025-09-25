@@ -577,11 +577,11 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
 
   const all = [];
   const widthMax = 3000;
-  all.push(drawTitle('t10时速排名', `${serverNameFullList[mainServer]}`));
+
   let list = []
   const top10SpeedRankingData = getTopRatingDuringTime(cutoffEventTop, time, date, compareTier, comparePlayerUid);
   const compareName = compareTier ? cutoffEventTop.getUserNameById(cutoffEventTop.getLatestRanking()[compareTier-1].uid) : (comparePlayerUid ? cutoffEventTop.getUserNameById(comparePlayerUid) : null);
-  const headerStringArray = ['排名', 'uid', 'id', '分数', '分差', compareName ? `与${compareName}分差` : null, `${time}min分数变化`, '速度排名', '当前数据获取时间', '上次数据获取时间']
+  const headerStringArray = ['排名', 'uid', 'id', '分数', '分差', compareName ? `与${compareName}分差` : null, `${time}min分数变化`, '速度排名', '分数变动次数', '前空白', '尾空白', '把均pt', '当前数据获取时间', '上次数据获取时间']
   //const headerStringArray = ['順位', 'uid', 'id', 'ポイント', '上との差', compareName ? `${compareName}さんと差` : null, `${time}時速`, '時速ランキング', '今の時間', '1hスタート時間']
   const top10RankingTable: Canvas[][] = Array.from({ length: 10 }, () => []);
   const drawWidth = []
@@ -620,7 +620,7 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
     gap: 10,
     color: "#a8a8a8"
   })
-
+  all.push(drawTitle('t10时速排名', `${serverNameFullList[mainServer]}`));
   list.push(drawListMerge(header.filter(Boolean), widthMax, false, "top", drawWidth))
   top10RankingTable.forEach((row) => {
     list.push(line)
@@ -1010,6 +1010,10 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
     distanceToPlayer: number,
     speedInTime: number,
     speedRanking: number,
+    playTimes: number,
+    firstTime: string,
+    lastTime: string,
+    averagePoints: number,
     nowTime: string,
     oldTime: string,
   }[] = [];
@@ -1022,6 +1026,7 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
     const oldData = top10_Old.find(item => item.uid == uid);
     const comparePlayerPoints = compareTier ? (top10List?.[compareTier-1]?.point) : (comparePlayerUid ? top10List.find(item => item.uid == comparePlayerUid)?.point : 0);
     const playerSpeedInfo = speed.find(item => item.uid == uid);
+    const playerTimesInfo = countSpeedData(getRatingByPlayer(limitPoints.filter(item => item.time >= old_time),uid))
     top10_ranking.push({
       ranking: index + 1,
       uid: uid,
@@ -1031,9 +1036,13 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
       distanceToPlayer: comparePlayerPoints ? nowPoints - comparePlayerPoints: 0,
       speedInTime: playerSpeedInfo.speed,
       speedRanking: playerSpeedInfo.speedRanking,
+      playTimes: playerTimesInfo.count,
+      firstTime: playerTimesInfo.firstTime > 0 ? `${Math.round((playerTimesInfo.firstTime-old_time)/(60*1000))}min` : '',
+      lastTime: playerTimesInfo.lastTime > 0 ? `${Math.round((playerTimesInfo.lastTime-now)/(60*1000))}min` : '',
+      averagePoints: playerTimesInfo.count>0 ? Math.floor(playerSpeedInfo.speed/playerTimesInfo.count) : 0,
       nowTime: (new Date(now)).toLocaleString(),
       oldTime: (new Date(old_time)).toLocaleString(),
-    })
+      })
   })
   return top10_ranking;
 }
@@ -1108,61 +1117,34 @@ function computeSpeed(
   }
   return speed;
 }
-/*
 
-function getSpeedData(setStartToZero = false, event: Event, mainServer: Server, points: { time: number, value: any }[]):{x:Date,y:number}[]{
-  const hour = 60 * 60 * 1000;
+function countSpeedData(playerPoints: { time: number; value: number }[]){
+  let firstTime = 0;
+  let lastTime = 0;
+  let count = -1;
+  let tmpPoint = 0;
+  let init = false;
+  for (const data of playerPoints.reverse()) {
 
-  let thisHour = event.startAt[mainServer];
-  let speed: {time: number, value: number}[] = []
-  let startValue = null;
-  let endValue = null;
-  let tmpTime = 0;
-  for (let i = points.length - 1; i >= 0; i--) {
-    const element = points[i];
-    if (element.time - thisHour >= hour){
-      if (startValue > 0 && endValue > 0){
-        speed.push({time: thisHour, value: tmpTime == 0 ? 0 : (endValue - startValue) / tmpTime})
-        //speed.push({time: thisHour, value: (endValue - startValue)})
-        //console.log({startValue, endValue, tmpTime})
-      }
-      if (element.value > 0){
-        startValue = endValue
-        endValue = element.value
-      }else{
-        startValue = null;
-        endValue = null;
-      }
-      thisHour += hour;
-      tmpTime = 0;
+    if (data.value == -1) {
+      return {firstTime: -1, lastTime: -1, count: -1};
     }
-    if (element.value > 0){
-      if (!startValue){
-        startValue = element.value;
+    if (data?.value != tmpPoint){
+      if (init && !firstTime){
+        firstTime = data.time;
       }
-      if (element.value > endValue){
-        tmpTime ++;
+      if (tmpPoint == 0 && data.value > 0){
+        init = true;
       }
-      endValue = element.value;
-
-    }
-
-  }
-  //console.log(speed)
-  var chartDate:{x:Date,y:number}[] = [];
-  for(let i =0;i<speed.length;i++){
-    const element = speed[i]
-    if(setStartToZero){
-      //chartDate.push({x:new Date(0),y:0});
-      chartDate.push({x:new Date(element.time-speed.at(-1).time),y:element.value});
-    }
-    else{
-      //chartDate.push({x:new Date(points.at(-1).time),y:0});
-      chartDate.push({x:new Date(element.time),y:element.value});
+      lastTime = data.time;
+      count += 1;
+      if (data.value > 0)
+        tmpPoint = data.value;
     }
   }
-  //console.log(chartDate);
-  return chartDate;
+  if (count == 0)
+    return {firstTime: -1, lastTime: -1, count: 0};
+  return {firstTime: firstTime, lastTime: lastTime, count: count};
 }
-*/
+
 
