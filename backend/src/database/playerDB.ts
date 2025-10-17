@@ -168,7 +168,8 @@ export class PlayerDB {
     this.db = this.client.db(dbName);
     //尝试连接数据库，如果连接失败则抛出错误
     this.connect().catch((err) => {
-      console.log(`连接数据库失败 Error: ${err.message}`);
+      if (process.env.LOCAL_DB == 'true')
+        console.log(`连接数据库失败 Error: ${err.message}`);
     });
   }
 
@@ -245,7 +246,7 @@ export class PlayerDB {
     await this.getCollection().updateOne({ _id: playerId }, { $set: data })
     return data
   }
-  
+
   async updateCharacterBouns(playerId: number, list) {
     var data: playerDetail = await this.getPlayer(playerId)
     for (const { characterId, potential, characterTask} of list) {
