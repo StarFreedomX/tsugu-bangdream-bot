@@ -18,7 +18,8 @@ export class compositionResultDB {
     this.db = this.client.db(dbName);
     //尝试连接数据库，如果连接失败则抛出错误
     this.connect().catch((err) => {
-      console.log(`连接数据库失败 Error: ${err.message}`);
+      if (process.env.LOCAL_DB == 'true')
+        console.log(`连接数据库失败 Error: ${err.message}`);
     });
   }
 
