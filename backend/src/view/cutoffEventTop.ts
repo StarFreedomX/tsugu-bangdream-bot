@@ -1027,6 +1027,11 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
     const comparePlayerPoints = compareTier ? (top10List?.[compareTier-1]?.point) : (comparePlayerUid ? top10List.find(item => item.uid == comparePlayerUid)?.point : 0);
     const playerSpeedInfo = speed.find(item => item.uid == uid);
     const playerTimesInfo = countSpeedData(getRatingByPlayer(limitPoints.filter(item => item.time >= old_time),uid))
+    const fmt = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      dateStyle: 'medium',
+      timeStyle: 'medium'
+    });
     top10_ranking.push({
       ranking: index + 1,
       uid: uid,
@@ -1040,8 +1045,8 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
       firstTime: playerTimesInfo.firstTime > 0 ? `${Math.round((playerTimesInfo.firstTime-old_time)/(60*1000))}min` : '',
       lastTime: playerTimesInfo.lastTime > 0 ? `${Math.round((playerTimesInfo.lastTime-now)/(60*1000))}min` : '',
       averagePoints: playerTimesInfo.count>0 ? Math.floor(playerSpeedInfo.speed/playerTimesInfo.count) : 0,
-      nowTime: (new Date(now)).toLocaleString(),
-      oldTime: (new Date(old_time)).toLocaleString(),
+      nowTime: fmt.format(new Date(now)),
+      oldTime: fmt.format(new Date(old_time)),
       })
   })
   return top10_ranking;
