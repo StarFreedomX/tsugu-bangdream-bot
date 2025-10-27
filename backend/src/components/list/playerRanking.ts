@@ -63,9 +63,10 @@ export async function drawPlayerRankingInList(user: User, backgroudColor: string
 
     //玩家昵称
     var playerNameImage = drawText({
-        text: removeBraces(user.name),
+        text: user.name,
         textSize: 23,
-        maxWidth: 450
+        maxWidth: 450,
+        parseStyle: true,
     });
     ctx.drawImage(playerNameImage, 210, 10);
 
@@ -77,9 +78,10 @@ export async function drawPlayerRankingInList(user: User, backgroudColor: string
 
     //简介
     var playerIntroductionImage = drawText({
-        text: removeBraces(user.introduction),
+        text: user.introduction,
         textSize: 20,
-        maxWidth: 450
+        maxWidth: 450,
+        parseStyle: true,
     });
     ctx.drawImage(playerIntroductionImage, 210, 75);
 

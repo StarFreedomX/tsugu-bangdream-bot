@@ -8,46 +8,224 @@ interface warpTextOptions {
     text: string,
     textSize?: number,
     maxWidth: number,
-    lineHeight?: number
+    lineHeight?: number,
+    font?: "FangZhengHeiTi" | "old" | "default",
     color?: string,
-    font?: "FangZhengHeiTi" | "old" | "default"
+    parseStyle?: boolean
 }
 
-//画文字,自动换行
 export function drawText({
-    text,
-    textSize = 40,
-    maxWidth,
-    lineHeight = textSize * 4 / 3,
-    color = "#505050",
-    font = "old"
-}: warpTextOptions): Canvas {
-    var wrappedTextData = wrapText({ text, maxWidth, lineHeight, textSize });
-    if (wrappedTextData.numberOfLines == 0) {
-        var canvas: Canvas = new Canvas(1, lineHeight);
+text,
+textSize = 40,
+maxWidth,
+lineHeight = textSize * 4 / 3,
+color = "#505050",
+opacity = 1,
+font = "old",
+parseStyle = false
+}) {
+    if (!parseStyle) {
+      // 原样绘制
+      return drawPlainText({ text, textSize, maxWidth, lineHeight, color, opacity, font });
     }
-    else if (wrappedTextData.numberOfLines == 1) {
-        var canvas: Canvas = new Canvas(1, 1);
-        var ctx = canvas.getContext('2d');
-        setFontStyle(ctx, textSize, font);
-        var width = maxWidth = ctx.measureText(wrappedTextData.wrappedText[0]).width
-        canvas = new Canvas(width, lineHeight);
+    text = ` ${text}`
+
+    // 样式
+    let currentStyle = {
+      bold: false,
+      italic: false,
+      underline: false,
+      subscript: false,
+      superscript: false,
+      strike: false,
+      color,
+      opacity
+    };
+
+    const segments = parseStyledText(text, currentStyle);
+
+    const ctxTmp = new Canvas(1, 1).getContext("2d");
+    let totalWidth = 0;
+    let italicOffset = 0;
+    let extraTop = 0;
+    let extraBottom = 0;
+
+    for (const seg of segments) {
+        setFontStyleWithStyle(ctxTmp, seg.textSize || textSize, font, seg);
+        const w = ctxTmp.measureText(seg.text).width;
+        totalWidth += w;
+        if (seg.italic) italicOffset = Math.max(italicOffset, (seg.textSize || textSize) * 0.2);
+        if (seg.superscript) extraTop = Math.max(extraTop, (seg.textSize || textSize) * 0.5);
+        if (seg.subscript) extraBottom = Math.max(extraBottom, (seg.textSize || textSize) * 0.5);
     }
-    else {
-        var canvas: Canvas = new Canvas(maxWidth, lineHeight * wrappedTextData.numberOfLines);
+    // 调整 Canvas 尺寸
+    const canvas = new Canvas(
+        totalWidth + italicOffset,
+        lineHeight + extraTop + extraBottom
+    );
+    const ctx = canvas.getContext("2d");
+
+
+    let x = 0;
+    const yBase = lineHeight / 2 + textSize / 3;
+    const underlineSegments = [];
+    const strikeSegments = [];
+    for (const seg of segments) {
+        let segSize = textSize;
+        let offsetY = 0;
+        if (seg.subscript || seg.superscript) {
+            segSize *= 0.6;
+            if (seg.superscript) offsetY = -segSize * 0.6;
+            if (seg.subscript) offsetY = segSize * 0.3;
+        }
+        setFontStyleWithStyle(ctx, segSize, font, seg);
+        ctx.fillStyle = seg.color;
+        ctx.globalAlpha = seg.opacity;
+
+        const y = yBase + offsetY;
+
+        const shear = seg.italic ? -0.2 : 0; // 右倾斜
+        ctx.save();
+
+        const w = ctx.measureText(seg.text).width;
+
+        const italicExtra = Math.abs(shear) * segSize;
+
+        // 应用倾斜变换
+        ctx.setTransform(1, 0, shear, 1, x + italicExtra, 0);
+        ctx.fillText(seg.text, 0, y);
+        ctx.restore();
+
+        // 记录需要画线的区段
+        if (seg.underline) {
+            underlineSegments.push({
+                start: x,
+                end: x + w + italicExtra,
+                color: seg.color,
+                opacity: seg.opacity,
+                y: y + segSize * 0.15
+            });
+        }
+        if (seg.strike) {
+            strikeSegments.push({
+                start: x,
+                end: x + w + italicExtra,
+                color: seg.color,
+                opacity: seg.opacity,
+                y: y - segSize * 0.3 // 中线稍微靠上
+            });
+        }
+        ctx.globalAlpha = 1;
+
+        // 前进 x：正常宽度 + 倾斜预留量
+        x += w + italicExtra;
+
     }
-    var ctx = canvas.getContext('2d');
-    let y = lineHeight / 2 + textSize / 3
-    ctx.textBaseline = 'alphabetic'
-    setFontStyle(ctx, textSize, font);
-    ctx.fillStyle = color;
-    var wrappedText = wrappedTextData.wrappedText
-    for (var i = 0; i < wrappedText.length; i++) {
-        ctx.fillText(wrappedText[i], 0, y);
-        y += lineHeight;
+    ctx.save();
+    for (const u of underlineSegments) {
+        drawLine(ctx, u.start, u.y, u.end, u.y, u.color, u.opacity);
     }
+    for (const s of strikeSegments) {
+        drawLine(ctx, s.start, s.y, s.end, s.y, s.color, s.opacity, 8);
+    }
+    ctx.restore();
+
     return canvas;
 }
+
+// 解析器
+function parseStyledText(input, baseStyle) {
+    const regex = /\[(b|i|u|sub|sup|c|s|\w{2})\](?:\[([0-9a-fA-F]{6})\])?/g;
+    let result = [];
+    let lastIndex = 0;
+    let match;
+    let style = { ...baseStyle };
+
+    while ((match = regex.exec(input)) !== null) {
+        if (match.index > lastIndex) {
+            result.push({ ...style, text: input.slice(lastIndex, match.index) });
+        }
+
+        const tag = match[1].toLowerCase();
+        const extra = match[2];
+
+        switch (tag) {
+            case "b": style.bold = true; break;
+            case "i": style.italic = true; break;
+            case "u": style.underline = true; break;
+            case "s": style.strike = true; break;
+            case "sub": style.subscript = true; style.superscript = false; break;
+            case "sup": style.superscript = true; style.subscript = false; break;
+            case "c": if (extra) style.color = "#" + extra; break;
+            default:
+              // 判断是否为两位十六进制透明度
+                if (/^[0-9a-fA-F]{2}$/.test(tag)) {
+                    style.opacity = parseInt(tag, 16) / 256;
+                }
+                break;
+        }
+
+        lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < input.length) {
+        result.push({ ...style, text: input.slice(lastIndex) });
+    }
+
+    return result;
+}
+
+// 画线函数
+function drawLine(ctx, x1, y1, x2, y2, color, opacity = 1, width = 2) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+}
+
+// 字体设置
+function setFontStyleWithStyle(ctx, size, font, style) {
+    let prefix = "";
+    if (style.bold) prefix += "bold ";
+    ctx.font = prefix + size + "px " + font + ",Microsoft Yahei";
+}
+
+// 纯文字绘制（无样式）
+function drawPlainText({ text, textSize, maxWidth, lineHeight, color, opacity, font }) {
+    const wrappedTextData = wrapText({ text, maxWidth, lineHeight, textSize });
+    let canvas;
+    if (wrappedTextData.numberOfLines === 0) {
+        canvas = new Canvas(1, lineHeight);
+    } else if (wrappedTextData.numberOfLines === 1) {
+        const ctxTmp = new Canvas(1, 1).getContext("2d");
+        setFontStyle(ctxTmp, textSize, font);
+        const width = ctxTmp.measureText(wrappedTextData.wrappedText[0]).width;
+        canvas = new Canvas(width, lineHeight);
+    } else {
+        canvas = new Canvas(maxWidth, lineHeight * wrappedTextData.numberOfLines);
+    }
+
+    const ctx = canvas.getContext("2d");
+    setFontStyle(ctx, textSize, font);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = opacity;
+    ctx.textBaseline = "alphabetic";
+
+    let y = lineHeight / 2 + textSize / 3;
+    for (const line of wrappedTextData.wrappedText) {
+        ctx.fillText(line, 0, y);
+        y += lineHeight;
+    }
+
+    ctx.globalAlpha = 1;
+    return canvas;
+}
+
 
 export function wrapText({
     text,
