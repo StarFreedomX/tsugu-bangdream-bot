@@ -15,7 +15,8 @@ export async function drawPlayerDetailBlockWithIllust(player: Player): Promise<C
     var playerText = drawText({
         text: player.profile.userName,
         maxWidth: 800,
-        textSize: 75
+        textSize: 75,
+        parseStyle: true,
     })
     list.push(drawImageListCenter([playerText]))
     //等级
@@ -42,7 +43,8 @@ export async function drawPlayerDetailBlockWithIllust(player: Player): Promise<C
     var introductionText = drawText({
         text: player.profile.introduction,
         maxWidth: 800,
-        textSize: 35
+        textSize: 35,
+        parseStyle: true,
     })
     list.push(drawImageListCenter([introductionText]))
     list.push(new Canvas(1, 25))
