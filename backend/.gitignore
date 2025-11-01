@@ -20,3 +20,6 @@ tsconfig.tsbuildinfo
 cache/*
 logs/*
 run_normal.bat
+
+package-lock.json
+yarn.lock
