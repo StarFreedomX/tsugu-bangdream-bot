@@ -34,7 +34,7 @@ export class cardInfo{
             technique: add,
             visual: add
         })
-        
+
         {
             const tmpStat1 = mulStat(this.stat, player.characterBouns[this.card.characterId].potential)
             const tmpStat2 = mulStat(this.stat, player.characterBouns[this.card.characterId].characterTask)
@@ -67,7 +67,7 @@ export class cardInfo{
                     })
                 }
             }
-            
+
             for (const { characterId, percent } of event.characters) {
                 if (characterId == this.card.characterId) {
                     flag |= 2
@@ -78,7 +78,7 @@ export class cardInfo{
                     })
                 }
             }
-            
+
             for (const { situationId, percent } of event.members) {
                 if (situationId == this.card.cardId) {
                     addStat(tmpStat, {
@@ -222,7 +222,7 @@ export function bruteForce(charts: Array<Chart>, list: Array<cardInfo>, areaItem
             if (Set >> i & 1) {
                 break
             }
-            initTeamList(depth + 1, Set | 1 << i, [list[i], ...team])
+            initTeamList(depth + 1, Set | (1 << i), [list[i], ...team])
         }
     }
     var data: calcResult = {
