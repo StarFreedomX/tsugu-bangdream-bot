@@ -971,19 +971,34 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
   return [buffer];
 }
 
+//points按时间分数升序排列
 export function getRatingByPlayer(points: Array<{
-    time:number,
-    uid:number,
-    value:number
-}>, playerId: number)
-{
+    time: number,
+    uid: number,
+    value: number
+}>, playerId: number) {
     const map = {}
+    let tmpTime = -1,counts=0;
     for (const info of points) {
+        //极大性能开销，弃用
+        //if (points.filter(p => p.time === info.time).length !== 10) continue;
         if (map[info.time] == undefined)
             map[info.time] = -1
         if (info.uid == playerId)
             map[info.time] = info.value
+        if (info.time !== tmpTime){
+            //防bd插入单独数据(2025.11.4 03:00:01仅出现t1玩家数据 导致其他t10玩家point列表出现-1)
+            if (tmpTime !== -1 && counts !== 10){
+                delete map[tmpTime];
+            }
+            tmpTime = info.time;
+            counts = 1;
+        } else {
+            counts++;
+        }
     }
+    if (counts !== 10) delete map[tmpTime];
+
     const timestamp = Object.keys(map)
     return timestamp.sort((a, b) => parseInt(b) - parseInt(a)).map((t) => {
         return {
