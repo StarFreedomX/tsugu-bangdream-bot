@@ -223,13 +223,16 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
       let challengePlayTimes = 0;
       let changeCPs = 0;
 
-      const extendedRating = day ? playerRating : [...playerRating, {
-        time: nowEvent.startAt[mainServer]+1,
-        value: -1
-      },{
-        time: nowEvent.startAt[mainServer],
-        value: 0
-      }];
+        const playerStartTime = nowEvent.startAt[mainServer]
+
+        const extendedRating = day ? playerRating :
+            [...playerRating.filter(item => item.time > playerStartTime), {
+                time: playerStartTime + 1,
+                value: -1
+            }, {
+                time: playerStartTime,
+                value: 0
+            }];
 
 
       //console.log(extendedRating.slice(-50))
@@ -342,6 +345,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
           multiPlayCPs += addCPs;
           changeCPs += addCPs;
         }
+                const sleepTime = crossHour > 21 - tier ? (crossHour / 8) + tier : 0
 
         // 跳到下一个有效 pair（防止重复处理）
         i = j - 1
