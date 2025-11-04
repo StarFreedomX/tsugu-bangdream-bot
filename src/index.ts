@@ -38,6 +38,7 @@ import { getRemoteDBUserData } from './api/remoteDB'
 import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySearch'
 import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
+import { isInteger } from "./commands/utils";
 
 
 export const name = 'tsugu-bangdream-bot';
@@ -360,7 +361,7 @@ export function apply(ctx: Context, config: Config) {
 
   ctx.command('前十车速 [commandArgs:text]', '查询当前前十车速排名', cmdConfig)
     .option('length', '-l <length:string> 指定时间范围，默认60(单位min)')
-    .option('time', '-t <time:number> 指定结束统计的整点时刻')
+    .option('time', '-t <time:string> 指定结束统计的时间，格式为H或HH:mm')
     .option('date', '-d <date:string> 指定结束统计日期，格式为"年/月/日"或"月/日"(分隔符用.也可)')
     .option('player', '-p <player:string> 指定玩家')
     .action(async ({ session, options }, commandArgs) => {
@@ -381,13 +382,13 @@ export function apply(ctx: Context, config: Config) {
 
       //识别player，格式为t数字/p数字
       const isPlayer = (s: string) => (/^t([1-9]|10)$/i.test(s) || /^p\d+$/i.test(s))
-      const isHour = (s: string) => (/^(?:[0-9]|1[0-9]|2[0-4])$/.test(s))
+      const isHour = (s: string) => (/^(?:[01]?\d|2[0-4])(?:[:：][0-5]\d)?$/.test(s))
       const isDate = (s: string) => (/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/.test(s))
       const isTimeRange = (s: string) => (/^\d+(min|h|m)?$/i.test(s))
 
       let player = options?.player;
       let length = isTimeRange(options?.length) ? parseTimeToMinutes(options.length) : undefined;
-      let timeHour = options.time;
+      let timeHour = isHour(options.time) ? Number(options.time.replace(/:/g,".")) : undefined;
       let date = isDate(options?.date) ? parseDate(options.date) : undefined;
       let serverName = undefined;
 
@@ -396,7 +397,7 @@ export function apply(ctx: Context, config: Config) {
           if (isPlayer(arg)) { //玩家
             player ??= arg.replace(/^p/i, '');
           } else if (isHour(arg)) {
-            timeHour ??= Number(arg)
+            timeHour ??= Number(arg.replace(/:/g,"."))
           }else if(isDate(arg)) {
             date ??= parseDate(arg)
           }else if(isTimeRange(arg)){
@@ -406,10 +407,14 @@ export function apply(ctx: Context, config: Config) {
           }
         }
       if (timeHour){
-        if (date) date.setHours(timeHour);
-        else {
+        if (date) {
+          date.setHours((timeHour));
+          if (!isInteger(String(timeHour))){
+            date.setMinutes(Math.round(timeHour*100-100))
+          }
+        } else {
           const now = new Date()
-          date = new Date(now.getFullYear(),now.getMonth(),now.getDate(),timeHour,0,0,0);
+          date = new Date(now.getFullYear(),now.getMonth(),now.getDate(),timeHour,isInteger(String(timeHour)) ? 0 : Math.round(timeHour*100%100),0,0);
         }
       }
       const tsuguUserData = await observeUserTsugu(session)
