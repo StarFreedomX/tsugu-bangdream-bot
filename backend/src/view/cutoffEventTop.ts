@@ -178,7 +178,8 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             if (!day && count == maxCount) {
                 break
             }
-            if (playerRating[i].value != playerRating[i + 1].value) {
+            // 分数变动且间隔合理(bd防炸)
+            if ((playerRating[i].value != playerRating[i + 1].value) && (playerRating[i].time - playerRating[i + 1].time < 5 * 60 * 1000)) {
                 const mid = new Date((playerRating[i + 1].time + playerRating[i].time) / 2), score = playerRating[i].value - playerRating[i + 1].value
                 if (score > max || score < min ) continue;
                 count += 1
@@ -249,7 +250,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             while (j < extendedRating.length) {
                 if (extendedRating[j].value === -1) {
                     crossedSeparator = true
-                } else if (extendedRating[j].time - extendedRating[j - 1].time > 300 * 1000) {
+                } else if (extendedRating.at(j-1)?.time - extendedRating.at(j)?.time > 5 * 60 * 1000) {
                     crossedSeparator = true;
                     if (extendedRating[j].value >= 0) break;
                 } else if (extendedRating[j].value >= 0) break
@@ -264,10 +265,10 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
 
             if (diff === 0) continue
 
+            //跨越-1/bd炸了(出现中断点，需合理分配协力和清理cp)
             if (crossedSeparator) {
                 const timesPerHour = 28
                 const cpTimesPerHour = 30
-                //跨越-1/bd炸了(出现中断点，需合理分配协力和清理cp)
                 const avgLivePoints = (avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint) || avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints) / 8 || 11000);
                 const avgCPPoints = (avg(cpPoints.length > 50 ? cpPoints.slice(-50) : cpPoints) || avg(livePoint.length > 50 ? livePoint.slice(-50) : livePoint) * 8 || 85000);
                 const crossHour = (current.time - next.time) / (1000 * 60 * 60)
@@ -331,7 +332,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
                       '\nlivePoint', livePoint,
                       '\n-----------------------------')*/
                 }
-            } else if (diff > 50000) {
+            } else if (diff > 50000 && diff < 110000) {
                 challengePlayTimes += 1;
                 changeCPs -= 1600;
                 cpPoints.push(diff)
@@ -500,7 +501,9 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
             continue;
         }
         if (playerRating[i].value === tmpValue && i > 0) continue;
-        else if (tmpTime === -1 && (playerRating[i].value >= 0))
+        else if ((tmpTime === -1 && (playerRating[i].value >= 0)) ||
+            // bd防炸
+            (playerRating.at(i).time - playerRating.at(i+1).time > 5 * 60 * 1000))
             [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
         else {
             if (playerRating[i].time - tmpTime > limitTime) {
