@@ -613,7 +613,7 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandSong(config, displayedServerList, `nts${notes}`)
       return paresMessageList(list)
     })
-  ctx.command("查谱面 <songId:integer> [difficultyText:text]", "查谱面", cmdConfig)
+  ctx.command("查谱面 <songId:string> [difficultyText:text]", "查谱面", cmdConfig)
     .usage('根据曲目ID与难度查询铺面信息')
     .example('查谱面 1 :返回1号曲的所有铺面').example('查谱面 1 expert :返回1号曲的expert难度铺面')
     .action(async ({ session }, songId, difficultyText) => {
@@ -630,7 +630,10 @@ export function apply(ctx: Context, config: Config) {
         }
         difficultyId = fuzzySearchResult['difficulty'][0]
       }
-      const list = await commandSongChart(config, displayedServerList, songId, difficultyId)
+      let list = []
+      if (isInteger(songId))
+        list = await commandSongChart(config, displayedServerList, Number(songId), difficultyId)
+        else list = await commandSongChart(config, displayedServerList, 0, difficultyId, songId)
       return paresMessageList(list)
     })
   ctx.command("查自制谱 <songId:integer>", "查自制谱", cmdConfig)
