@@ -18,7 +18,7 @@ import mainAPI from "@/types/_Main";
 import { AreaItem } from "@/types/AreaItem";
 
 const router = express.Router();
-const playerDB = new PlayerDB(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/', 'tsugu-bangdream-bot')
+const playerDB = process.env.LOCAL_DB ? new PlayerDB(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/', 'tsugu-bangdream-bot') : null;
 
 router.post('/',
     [
@@ -31,7 +31,10 @@ router.post('/',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, eventId, useEasyBG, compress } = req.body;
-
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         try {
             const result = await commandMedleyDetail(playerId, getServerByServerId(mainServer), useEasyBG, compress, eventId);
             res.send(listToBase64(result));
@@ -52,6 +55,10 @@ router.post('/importPlayerData',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress } = req.body;
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         const player = new Player(playerId, mainServer)
         await player.initFull(false, 3)
         if (player.initError) {
@@ -133,6 +140,10 @@ router.post('/updateSong',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress, id, songId, difficulty } = req.body;
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         let player: playerDetail = await playerDB.getPlayer(playerId)
         const eventId = player?.currentEvent
         if (!eventId) {
@@ -160,6 +171,10 @@ router.post('/resetSong',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress } = req.body;
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         let player: playerDetail = await playerDB.getPlayer(playerId)
         const eventId = player?.currentEvent
         if (!eventId) {
@@ -186,7 +201,10 @@ router.post('/levelUp',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress } = req.body;
-
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         const areaItemList = Object.keys(mainAPI['areaItems']).map((areaItemId) => {
             const item = new AreaItem(parseInt(areaItemId))
             return {
@@ -233,7 +251,10 @@ router.post('/levelReset',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress } = req.body;
-
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         const areaItemList = Object.keys(mainAPI['areaItems']).map((areaItemId) => {
             const item = new AreaItem(parseInt(areaItemId))
             return {
@@ -275,7 +296,10 @@ router.post('/addCard',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, useEasyBG, compress, skill_level, break_rank, text } = req.body;
-
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         const cardList = matchCardList(fuzzySearch(text), [3, 0]).map((card) => {
             return {
                 id : card.cardId,
@@ -310,11 +334,12 @@ router.post('/delCard',
         const cardList = matchCardList(fuzzySearch(text), [3, 0]).map((card) => {
             return card.cardId
         })
+        if (!process.env.LOCAL_DB) res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
         await playerDB.delCard(playerId, cardList)
 
         try {
             const result = await commandMedleyDetail(playerId, getServerByServerId(mainServer), useEasyBG, compress);
-            res.send(listToBase64(result));
+            ;
         } catch (e) {
             console.log(e);
             res.status(500).send({ status: 'failed', data: '内部错误' });
@@ -336,7 +361,10 @@ router.post('/calcResult',
     middleware,
     async (req: Request, res: Response) => {
         const { playerId, mainServer, eventId, useEasyBG, compress, save, description } = req.body;
-
+        if (process.env.LOCAL_DB !== 'true') {
+            res.send(listToBase64(['错误：服务器未启用MONGO_DB']));
+            return;
+        }
         try {
             const result = await commandCalcResult(playerId, getServerByServerId(mainServer), useEasyBG, compress, eventId, save, description);
             res.send(listToBase64(result));
@@ -363,7 +391,6 @@ export async function commandMedleyDetail(playerId: number, mainServer: Server, 
 }
 
 export async function commandCalcResult(playerId: number, mainServer: Server, useEasyBG: boolean, compress: boolean, eventId?: number, save?: boolean, description?: string)/*: Promise<Array<Buffer | string>>*/ {
-
     let player :playerDetail  = await playerDB.getPlayer(playerId)
     var currentEvent = player.currentEvent
     if (eventId) {
