@@ -307,7 +307,6 @@ export function apply(ctx: Context, config: Config) {
   ctx.command('查岗 <playerId:string> [limit:string] [eventId] [serverName:string]', '查询前十车速', cmdConfig)
     .option('count', '-c <count:number> 指定显示最近的几次分数变化，默认20次')
     .option('day','-d <day:number> 指定活动开始的第几天的分数变动详情')
-    .option('limit',`-l <limit:string> 对分数进行筛选，格式为'>35000','<24000','20000-23000'(默认闭区间)`)
     .action(async ({ session, options }, playerId, limit, eventId, serverName) => {
       if (playerId == undefined) {
         return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
@@ -326,13 +325,14 @@ export function apply(ctx: Context, config: Config) {
           return `请确认输入的排名在1到10之间`
         }
       }
+      let f_limit;
       if (limit){
         let str = limit.trim()
           .replace(/＞/g, ">")
           .replace(/＜/g, "<")
           .replace(/＝/g, "=");
         if (/^>\d+$/.test(str)||/^<\d+$/.test(str)||/^>=\d+$/.test(str)||/^<=\d+$/.test(str)||/^\d+-\d+$/.test(str)){
-          options.limit ??= limit
+            f_limit ??= limit
         }else{
           serverName = eventId;
           eventId = limit;
@@ -355,7 +355,7 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
-      const list = await commandTopRateDetail(config, eventId === undefined ? undefined : Number(eventId), options.day, options.limit, options.count, playerId, tier, mainServer)
+      const list = await commandTopRateDetail(config, eventId === undefined ? undefined : Number(eventId), options.day, f_limit, options.count, playerId, tier, mainServer)
       return (paresMessageList(list))
     })
 
