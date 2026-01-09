@@ -18,6 +18,7 @@ import { drawDottedLine } from '@/image/dottedLine';
 import { resizeImage } from '@/components/utils';
 import { stackImage } from '@/components/utils';
 import { drawRoundedRectWithText } from "@/image/drawRect";
+import { presetColorList } from "@/types/Color";
 
 export async function drawCutoffEventTop(eventId: number, mainServer: Server, compress: boolean): Promise<Array<Buffer | string>> {
     var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
@@ -642,7 +643,6 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
     const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
     await cutoffEventTop.initFull(0);
 
-    // 基础校验
     if (!cutoffEventTop.isExist) {
         return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
     }
@@ -657,25 +657,19 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
     const widthMax = 3000;
     all.push(drawTitle('分速表', `${serverNameFullList[mainServer]}`));
 
-    // 确定时间范围
     const targetTime = date ? date.getTime() : Date.now();
     const startTimeLimit = targetTime - (time * 60 * 1000);
 
-    // 筛选显示范围内的点
     const allPointsInRange = cutoffEventTop.points.filter(p => p.time >= startTimeLimit && p.time <= targetTime);
     const displayTimeStamps = Array.from(new Set(allPointsInRange.map(p => p.time))).sort((a, b) => a - b);
 
-    // 增加回溯缓冲区（30分钟），用于计算范围内第一个点的分速
     const bufferTime = startTimeLimit - (30 * 60 * 1000);
     const calculationSource = cutoffEventTop.points.filter(p => p.time >= bufferTime && p.time <= targetTime);
 
-    // 获取排名快照
     let rankingAtTime: { uid: number; value: number }[] = [];
     if (!date) {
-        // 当前时刻：直接取最新
         rankingAtTime = cutoffEventTop.getLatestRanking().slice(0, 10).map(r => ({ uid: r.uid, value: r.point }));
     } else {
-        // 历史时刻：使用二分查找定位快照
         const sortedPoints = [...cutoffEventTop.points].sort((a, b) => a.time - b.time);
         const group = findTargetTimeRankingGroup(sortedPoints, targetTime);
         rankingAtTime = group.sort((a, b) => b.value - a.value).slice(0, 10);
@@ -685,7 +679,6 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         return [`错误: 在指定时间未找到有效的排名数据`];
     }
 
-    // 处理玩家数据与分速计算
     const players = [];
     for (let i = 0; i < rankingAtTime.length; i++) {
         const { uid, value: point } = rankingAtTime[i];
@@ -695,7 +688,6 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         const speeds: string[] = [];
         displayTimeStamps.forEach(currentTime => {
             const currentIdx = playerRating.findIndex(r => r.time === currentTime);
-            // 如果该分钟没数据或在榜外
             if (currentIdx === -1 || playerRating[currentIdx].value < 0) {
                 speeds.push("---");
                 return;
@@ -705,7 +697,6 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
             let prevValidPoint = null;
             let isGap = false;
 
-            // 回溯寻找前一个有效正数点
             for (let k = currentIdx + 1; k < playerRating.length; k++) {
                 if (playerRating[k].value >= 0) {
                     prevValidPoint = playerRating[k];
@@ -722,55 +713,63 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
                 speeds.push("---");
             }
         });
-
         players.push({ name, currentPt: point, speeds });
     }
 
-    const headerStringArray = ['时间', ...players.map(p => p.name)];
-    const header: Canvas[] = headerStringArray.map(text =>
-        drawRoundedRectWithText({ text: text, textSize: 30 })
-    );
+    // --- 同车识别逻辑 ---
+    const rooms = identifyRooms(players, 0.9); // 0.9 为模糊度调节常量
+    const colorMap = new Map<string, string>();
+    rooms.forEach((room, index) => {
+        const c = presetColorList[index % presetColorList.length];
+        const colorStr = `rgb(${c.r},${c.g},${c.b})`;
+        room.forEach(playerName => colorMap.set(playerName, colorStr));
+    });
 
-    // 当前分数行
-    const ptRow: Canvas[] = [drawList({ text: date.toLocaleDateString() })];
+    // 构建表头（如果是同车，后续上色）
+    const headerStringArray = ['时间', ...players.map(p => p.name)];
+    const header: Canvas[] = headerStringArray.map((text, idx) => {
+        const playerName = idx === 0 ? null : players[idx - 1].name;
+        const color = colorMap.get(playerName) || '#505050';
+        // return drawRoundedRectWithText({ text, textSize: 30, color, autoWrap: true, maxWidth: 200 });
+        return drawList({ text, textSize: 30, color, autoWrap: true, maxWidth: 250 });
+    });
+
+    const ptRow: Canvas[] = [drawList({ text: (date ?? new Date()).toLocaleDateString() })];
     players.forEach(p => {
         ptRow.push(drawList({ text: String(p.currentPt) }));
     });
 
-    // 数据行与列宽计算
     const tableRows: Canvas[][] = [];
-    let colWidths = new Array(headerStringArray.length).fill(0);
+    let colWidths: number[] = new Array(headerStringArray.length).fill(0);
     header.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
     ptRow.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
 
-    // 填充历史数据行（时间降序）
     for (let tIdx = displayTimeStamps.length - 1; tIdx >= 0; tIdx--) {
         const row: Canvas[] = [];
         const timeStr = new Date(displayTimeStamps[tIdx]).toTimeString().slice(0, 5);
-
         const timeImg = drawList({ text: timeStr });
         row.push(timeImg);
         colWidths[0] = Math.max(colWidths[0], timeImg.width);
 
         players.forEach((player, pIdx) => {
             const val = player.speeds[tIdx] ?? "---";
-            const speedImg = drawList({ text: val });
+            // 如果玩家在车队中，使用车队专属颜色，否则使用默认色
+            const playerColor = colorMap.get(player.name) || '#505050';
+            const speedImg = drawList({ text: val, color: playerColor });
             row.push(speedImg);
             colWidths[pIdx + 1] = Math.max(colWidths[pIdx + 1], speedImg.width);
         });
         tableRows.push(row);
     }
 
-
-    const finalDrawWidth = colWidths.map(w => w + 20);
+    const finalDrawWidth = colWidths.map(w => Math.max(...colWidths) + 20);
     const totalWidth = finalDrawWidth.reduce((a, b) => a + b, 0);
-
     const line = drawDottedLine({
         width: totalWidth, height: 30, startX: 5, startY: 15, endX: totalWidth - 5, endY: 15, radius: 2, gap: 10, color: "#a8a8a8"
     });
 
     let list = [];
-    list.push(drawListMerge(header, widthMax, false, "top", finalDrawWidth));
+    list.push(drawListMerge(header, widthMax, false, "center", finalDrawWidth));
     list.push(line);
     list.push(drawListMerge(ptRow, widthMax, true, "top", finalDrawWidth));
     list.push(line);
@@ -1144,4 +1143,54 @@ function countSpeedData(playerPoints: { time: number; value: number }[]) {
     return { firstTime: firstTime, lastTime: lastTime, count: count };
 }
 
+/**
+ * 判断哪些玩家在同一房间
+ * @param players 玩家数据列表
+ * @param similarityThreshold 相似度阈值 (0-1)，越高越严格。
+ * 因为是严格同时结算，建议设定在 0.8 - 0.9 之间以容忍极个别分钟的数据缺失。
+ */
+function identifyRooms(players: any[], similarityThreshold = 0.9) {
+    // 1. 将玩家的 speeds 转换为二进制节奏序列 (1表示有分变动, 0表示无)
+    const playerRhythms = players.map(p => ({
+        name: p.name,
+        // 只有纯数字且大于0才视为有效出分时刻
+        rhythm: p.speeds.map(s => {
+            const val = String(s);
+            return (val !== "---" && !val.includes("(") && parseInt(val) > 0) ? 1 : 0;
+        })
+    }));
 
+    const rooms: string[][] = [];
+    const assigned = new Set<string>();
+
+    for (let i = 0; i < playerRhythms.length; i++) {
+        if (assigned.has(playerRhythms[i].name)) continue;
+
+        const currentRoom = [playerRhythms[i].name];
+        for (let j = i + 1; j < playerRhythms.length; j++) {
+            if (assigned.has(playerRhythms[j].name)) continue;
+
+            let union = 0;
+            let intersection = 0;
+            const r1 = playerRhythms[i].rhythm;
+            const r2 = playerRhythms[j].rhythm;
+
+            for (let k = 0; k < r1.length; k++) {
+                if (r1[k] === 1 || r2[k] === 1) union++;
+                if (r1[k] === 1 && r2[k] === 1) intersection++;
+            }
+
+            const similarity = union === 0 ? 0 : intersection / union;
+
+            if (similarity >= similarityThreshold) {
+                currentRoom.push(playerRhythms[j].name);
+            }
+        }
+
+        if (currentRoom.length > 1) {
+            rooms.push(currentRoom);
+            currentRoom.forEach(name => assigned.add(name));
+        }
+    }
+    return rooms;
+}

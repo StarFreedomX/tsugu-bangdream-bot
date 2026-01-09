@@ -21,9 +21,20 @@ maxWidth,
 lineHeight = textSize * 4 / 3,
 color = "#505050",
 opacity = 1,
-font = "old",
-parseStyle = false
+font = "old" as "old" | "default",
+parseStyle = false,
+autoWrap = false
 }) {
+    if (autoWrap && maxWidth) {
+        return drawTextWithImages({
+            content: [text], // 包装成数组
+            textSize,
+            maxWidth,
+            lineHeight,
+            color,
+            font
+        });
+    }
     if (!parseStyle) {
       // 原样绘制
       return drawPlainText({ text, textSize, maxWidth, lineHeight, color, opacity, font });
