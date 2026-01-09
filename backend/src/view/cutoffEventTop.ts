@@ -638,44 +638,64 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
     return [buffer];
 }
 
-export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false, time = 60) {
+export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false, date: Date, time = 60) {
     const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
     await cutoffEventTop.initFull(0);
+
+    // 基础校验
     if (!cutoffEventTop.isExist) {
         return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
     }
-    if (cutoffEventTop.status != "in_progress") {
+    if (!date && cutoffEventTop.status != "in_progress") {
         return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+    }
+    if (date && (date.getTime() < cutoffEventTop.startAt || date.getTime() > cutoffEventTop.endAt)) {
+        return [`错误: ${date.toLocaleString()}不在当前活动时间内`]
     }
 
     const all = [];
     const widthMax = 3000;
     all.push(drawTitle('分速表', `${serverNameFullList[mainServer]}`));
 
-    const now = Date.now();
-    const startTimeLimit = now - (time * 60 * 1000);
-    const allPointsInRange = cutoffEventTop.points.filter(p => p.time >= startTimeLimit);
+    // 确定时间范围
+    const targetTime = date ? date.getTime() : Date.now();
+    const startTimeLimit = targetTime - (time * 60 * 1000);
 
-    const allTimeStamps = [];
-    for (const p of allPointsInRange) {
-        if (!allTimeStamps.includes(p.time)) allTimeStamps.push(p.time);
-    }
-    const displayTimeStamps = allTimeStamps;
+    // 筛选显示范围内的点
+    const allPointsInRange = cutoffEventTop.points.filter(p => p.time >= startTimeLimit && p.time <= targetTime);
+    const displayTimeStamps = Array.from(new Set(allPointsInRange.map(p => p.time))).sort((a, b) => a - b);
 
+    // 增加回溯缓冲区（30分钟），用于计算范围内第一个点的分速
     const bufferTime = startTimeLimit - (30 * 60 * 1000);
-    const calculationSource = cutoffEventTop.points.filter(p => p.time >= bufferTime);
+    const calculationSource = cutoffEventTop.points.filter(p => p.time >= bufferTime && p.time <= targetTime);
 
+    // 获取排名快照
+    let rankingAtTime: { uid: number; value: number }[] = [];
+    if (!date) {
+        // 当前时刻：直接取最新
+        rankingAtTime = cutoffEventTop.getLatestRanking().slice(0, 10).map(r => ({ uid: r.uid, value: r.point }));
+    } else {
+        // 历史时刻：使用二分查找定位快照
+        const sortedPoints = [...cutoffEventTop.points].sort((a, b) => a.time - b.time);
+        const group = findTargetTimeRankingGroup(sortedPoints, targetTime);
+        rankingAtTime = group.sort((a, b) => b.value - a.value).slice(0, 10);
+    }
+
+    if (rankingAtTime.length === 0) {
+        return [`错误: 在指定时间未找到有效的排名数据`];
+    }
+
+    // 处理玩家数据与分速计算
     const players = [];
-    const latestRanking = cutoffEventTop.getLatestRanking().slice(0, 10);
-
-    for (let i = 0; i < 10; i++) {
-        const { uid, point } = latestRanking[i];
+    for (let i = 0; i < rankingAtTime.length; i++) {
+        const { uid, value: point } = rankingAtTime[i];
         const name = cutoffEventTop.getUserNameById(uid);
         const playerRating = getRatingByPlayer(calculationSource, uid);
 
         const speeds: string[] = [];
         displayTimeStamps.forEach(currentTime => {
             const currentIdx = playerRating.findIndex(r => r.time === currentTime);
+            // 如果该分钟没数据或在榜外
             if (currentIdx === -1 || playerRating[currentIdx].value < 0) {
                 speeds.push("---");
                 return;
@@ -685,11 +705,10 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
             let prevValidPoint = null;
             let isGap = false;
 
-            // 回溯查找逻辑：寻找当前点之前的第一个正数点
+            // 回溯寻找前一个有效正数点
             for (let k = currentIdx + 1; k < playerRating.length; k++) {
                 if (playerRating[k].value >= 0) {
                     prevValidPoint = playerRating[k];
-                    // 如果不是紧邻的下一个点，说明中间有间断
                     if (k > currentIdx + 1) isGap = true;
                     break;
                 }
@@ -698,19 +717,13 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
             if (prevValidPoint) {
                 const diff = current.value - prevValidPoint.value;
                 const finalDiff = diff < 0 ? 0 : diff;
-                // 如果是回溯找到的，加上括号标记间断检测
                 speeds.push(isGap ? `(+${finalDiff})` : String(finalDiff));
             } else {
-                // 找不到之前的数据
                 speeds.push("---");
             }
         });
 
-        players.push({
-            name: name,
-            currentPt: point,
-            speeds: speeds
-        });
+        players.push({ name, currentPt: point, speeds });
     }
 
     const headerStringArray = ['时间', ...players.map(p => p.name)];
@@ -718,16 +731,19 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         drawRoundedRectWithText({ text: text, textSize: 30 })
     );
 
-    const ptRow: Canvas[] = [drawList({ text: '当前分数' })];
+    // 当前分数行
+    const ptRow: Canvas[] = [drawList({ text: date.toLocaleDateString() })];
     players.forEach(p => {
         ptRow.push(drawList({ text: String(p.currentPt) }));
     });
 
+    // 数据行与列宽计算
     const tableRows: Canvas[][] = [];
     let colWidths = new Array(headerStringArray.length).fill(0);
-    header.forEach((canvas, idx) => { colWidths[idx] = Math.max(colWidths[idx], canvas.width); });
-    ptRow.forEach((canvas, idx) => { colWidths[idx] = Math.max(colWidths[idx], canvas.width); });
+    header.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
+    ptRow.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
 
+    // 填充历史数据行（时间降序）
     for (let tIdx = displayTimeStamps.length - 1; tIdx >= 0; tIdx--) {
         const row: Canvas[] = [];
         const timeStr = new Date(displayTimeStamps[tIdx]).toTimeString().slice(0, 5);
@@ -736,38 +752,31 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         row.push(timeImg);
         colWidths[0] = Math.max(colWidths[0], timeImg.width);
 
-        players.forEach((player, playerIdx) => {
+        players.forEach((player, pIdx) => {
             const val = player.speeds[tIdx] ?? "---";
             const speedImg = drawList({ text: val });
             row.push(speedImg);
-            colWidths[playerIdx + 1] = Math.max(colWidths[playerIdx + 1], speedImg.width);
+            colWidths[pIdx + 1] = Math.max(colWidths[pIdx + 1], speedImg.width);
         });
         tableRows.push(row);
     }
 
-    const finalDrawWidth = colWidths.map(w => w + 20);
-    const totalWidth = finalDrawWidth.reduce((sum, w) => sum + w, 0);
 
-    let list = [];
+    const finalDrawWidth = colWidths.map(w => w + 20);
+    const totalWidth = finalDrawWidth.reduce((a, b) => a + b, 0);
+
     const line = drawDottedLine({
-        width: totalWidth,
-        height: 30,
-        startX: 5,
-        startY: 15,
-        endX: totalWidth - 5,
-        endY: 15,
-        radius: 2,
-        gap: 10,
-        color: "#a8a8a8"
+        width: totalWidth, height: 30, startX: 5, startY: 15, endX: totalWidth - 5, endY: 15, radius: 2, gap: 10, color: "#a8a8a8"
     });
 
+    let list = [];
     list.push(drawListMerge(header, widthMax, false, "top", finalDrawWidth));
     list.push(line);
     list.push(drawListMerge(ptRow, widthMax, true, "top", finalDrawWidth));
     list.push(line);
     list.push(line);
 
-    tableRows.forEach((row) => {
+    tableRows.forEach(row => {
         list.push(drawListMerge(row, widthMax, true, "top", finalDrawWidth));
         list.push(line);
     });
@@ -775,7 +784,7 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
     all.push(drawDatablock({ list }));
     all.push(await drawEventDatablock(new Event(eventId), [mainServer]));
 
-    let buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress });
+    const buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress });
     return [buffer];
 }
 
