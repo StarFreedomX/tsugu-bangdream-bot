@@ -33,7 +33,13 @@ import { commandTopRunningStatus } from "./commands/topRunningStatus";
 import { commandTopTenMinuteSpeed } from "./commands/topTenMinuteSpeed";
 import { Server } from './types/Server'
 import { globalDefaultServer, tsuguUser } from './config'
-import { tierListOfServerToString, checkLeftDigits, paresMessageList, stringArrayToNumberArray } from './utils'
+import {
+    tierListOfServerToString,
+    checkLeftDigits,
+    paresMessageList,
+    stringArrayToNumberArray,
+    parseTimeToMinutes, parseDate
+} from './utils'
 import { getRemoteDBUserData } from './api/remoteDB'
 import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySearch'
 import {} from 'koishi-plugin-adapter-onebot'
@@ -365,21 +371,6 @@ export function apply(ctx: Context, config: Config) {
     .option('date', '-d <date:string> 指定结束统计日期，格式为"年/月/日"或"月/日"(分隔符用.也可)')
     .option('player', '-p <player:string> 指定玩家')
     .action(async ({ session, options }, commandArgs) => {
-      //识别时间，格式为数字min/数字h/数字m
-      const parseTimeToMinutes = (timeStr: string): number => {
-        const m = timeStr.toLowerCase().match(/^(\d+)(min|h|m)?$/)
-        return m ? parseFloat(m[1]) * (m[2] === 'h' ? 60 : 1): undefined;
-      }
-      function parseDate(str: string): Date | undefined {
-        const m = str.match(/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/);
-        if (!m) return;
-        if (m[1]) return new Date(+m[1], +m[2] - 1, +m[3]);
-        const now = new Date();
-        const d = new Date(now.getFullYear(), +m[4] - 1, +m[5]);
-        const limit = new Date(now); limit.setMonth(now.getMonth() + 1);
-        return d > limit ? new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()) : d;
-      }
-
       //识别player，格式为t数字/p数字
       const isPlayer = (s: string) => (/^t([1-9]|10)$/i.test(s) || /^p\d+$/i.test(s))
       const isHour = (s: string) => (/^(?:[01]?\d|2[0-4])(?:[:：][0-5]\d)?$/.test(s))
@@ -444,21 +435,69 @@ export function apply(ctx: Context, config: Config) {
       return (paresMessageList(list))
     })
 
-  ctx.command('分速表 [serverName:string]')
-    .option('time', '-t <time:number> 指定时间范围，默认60(单位min)')
-    .action(async ({ session, options }, serverName) => {
-      const tsuguUserData = await observeUserTsugu(session)
-      let mainServer: Server = tsuguUserData.mainServer
-      if (serverName) {
-        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
-        if (serverFromServerNameFuzzySearch == -1) {
-          return '错误: 服务器名未能匹配任何服务器'
-        }
-        mainServer = serverFromServerNameFuzzySearch
-      }
-      const list = await commandTopTenMinuteSpeed(config, mainServer, options.time)
-      return (paresMessageList(list))
-    })
+    ctx.command('分速表 [commandArgs:text]', '查询当前前十分速表', cmdConfig)
+        .option('length', '-l <length:string> 指定时间范围，默认60(单位min)')
+        .option('time', '-t <time:string> 指定结束统计的时间，格式为H或HH:mm')
+        .option('date', '-d <date:string> 指定结束统计日期，格式为"年/月/日"或"月/日"(分隔符用.也可)')
+        .action(async ({ session, options }, commandArgs) => {
+
+            const isHour = (s: string) => (/^(?:[01]?\d|2[0-4])(?:[:：][0-5]\d)?$/.test(s))
+            const isDate = (s: string) => (/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/.test(s))
+            const isTimeRange = (s: string) => (/^\d+(min|h|m)?$/i.test(s))
+
+            let length = isTimeRange(options?.length) ? parseTimeToMinutes(options.length) : undefined;
+            let timeHourStr = isHour(options?.time) ? options.time : undefined;
+            let date = isDate(options?.date) ? parseDate(options.date) : undefined;
+            let serverName = undefined;
+
+            // 解析 commandArgs
+            if (commandArgs?.length) {
+                for (const arg of commandArgs.trim().split(/\s+/g)) {
+                    if (isHour(arg)) {
+                        timeHourStr ??= arg;
+                    } else if (isDate(arg)) {
+                        date ??= parseDate(arg);
+                    } else if (isTimeRange(arg)) {
+                        length ??= parseTimeToMinutes(arg);
+                    } else if (!/\d/.test(arg)) { // 不含数字，视为服务器名
+                        serverName ??= arg;
+                    }
+                }
+            }
+
+            if (timeHourStr) {
+                const [h, m] = timeHourStr.split(/[:：]/).map(Number);
+                if (date) {
+                    date.setHours(h);
+                    date.setMinutes(m || 0);
+                    date.setSeconds(0);
+                    date.setMilliseconds(0);
+                } else {
+                    const now = new Date();
+                    date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m || 0, 0, 0);
+                }
+            }
+
+            // 服务器识别
+            const tsuguUserData = await observeUserTsugu(session)
+            let mainServer: Server = tsuguUserData.mainServer
+            if (serverName) {
+                const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+                if (serverFromServerNameFuzzySearch == -1) {
+                    return '错误: 服务器名未能匹配任何服务器'
+                }
+                mainServer = serverFromServerNameFuzzySearch
+            }
+
+            length ??= 60;
+            if (length && !/^[0-9]+$/.test(String(length))) {
+                return '参数length输入无效，请指定正确的时间长度(单位min)';
+            }
+
+            const list = await commandTopTenMinuteSpeed(config, mainServer, length, date)
+            return (paresMessageList(list))
+        })
+
   ctx.command('查稼动 <playerId:string> [eventId] [serverName:string]')
     .alias('查稼働')
     .option('time', '-t <time:number> 指定时间边界，默认25(单位min)')

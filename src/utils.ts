@@ -61,3 +61,18 @@ export function stringArrayToNumberArray(strArray: any[]): number[] {
     }
     return numArray
 }
+
+export function parseTimeToMinutes(timeStr: string): number {
+    const m = timeStr.toLowerCase().match(/^(\d+)(min|h|m)?$/)
+    return m ? parseFloat(m[1]) * (m[2] === 'h' ? 60 : 1) : undefined;
+}
+
+export function parseDate(str: string): Date | undefined {
+    const m = str.match(/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/);
+    if (!m) return;
+    if (m[1]) return new Date(+m[1], +m[2] - 1, +m[3]);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), +m[4] - 1, +m[5]);
+    const limit = new Date(now); limit.setMonth(now.getMonth() + 1);
+    return d > limit ? new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()) : d;
+}

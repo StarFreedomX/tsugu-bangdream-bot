@@ -53,7 +53,7 @@ export function drawList({
 
     var textImage: Canvas
     if (typeof text == "string") {
-        textImage = drawText({ text, maxWidth: xmax, lineHeight });
+        textImage = drawText({ text, maxWidth: xmax, lineHeight, color });
     }
     else if (content != undefined) {
         textImage = drawTextWithImages({
