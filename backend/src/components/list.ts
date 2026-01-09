@@ -30,7 +30,8 @@ interface ListOptions {
     lineSpacing?: number;
     color?: string;
     maxWidth?: number;
-    align?: "top" | "bottom" | "center"
+    align?: "top" | "bottom" | "center";
+    autoWrap?: boolean;
 }
 
 //画表格中的一行
@@ -42,18 +43,19 @@ export function drawList({
     lineHeight = textSize * 1.5,
     spacing = textSize / 3,
     color = '#505050',
-    maxWidth = 800
-
+    maxWidth = 800,
+    autoWrap = false
 }: ListOptions): Canvas {
     const xmax = maxWidth - 40
     const keyImage = drawRoundedRectWithText({
         text: key,
         textSize: 30,
+        autoWrap,
     });
 
     var textImage: Canvas
     if (typeof text == "string") {
-        textImage = drawText({ text, maxWidth: xmax, lineHeight, color });
+        textImage = drawText({ text, maxWidth: xmax, lineHeight, color, autoWrap });
     }
     else if (content != undefined) {
         textImage = drawTextWithImages({
@@ -62,7 +64,7 @@ export function drawList({
             lineHeight,
             textSize,
             spacing,
-            color
+            color,
         });
     }
     else {
