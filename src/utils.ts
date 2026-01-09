@@ -10,14 +10,15 @@ export function paresMessageList(list?: Array<Buffer | string>): Array<Element |
     for (let i = 0; i < list.length; i++) {
         parseMessage(list[i])
     }
+
     function parseMessage(message: Buffer | string) {
         if (typeof message == 'string') {
             messageList.push(message)
-        }
-        else if (message instanceof Buffer) {
+        } else if (message instanceof Buffer) {
             messageList.push(h.image(message, 'image/png'))
         }
     }
+
     return messageList
 }
 

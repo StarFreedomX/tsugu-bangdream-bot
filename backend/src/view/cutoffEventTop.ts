@@ -9,8 +9,8 @@ import { drawDatablock } from '@/components/dataBlock';
 import { outputFinalBuffer } from '@/image/output';
 import { drawPlayerRankingInList } from '@/components/list/playerRanking';
 import {
-  drawCutoffEventTopChart,
-  drawCutOffEventTopSingleChart,
+    drawCutoffEventTopChart,
+    drawCutOffEventTopSingleChart
 } from '@/components/chart/cutoffChart';
 import { songChartRouter } from '@/routers/songChart';
 import { drawList, drawListMerge } from '@/components/list';
@@ -50,7 +50,7 @@ export async function drawCutoffEventTop(eventId: number, mainServer: Server, co
     var listImage = drawDatablock({ list });
     all.push(listImage);
 
-    var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress, })
+    var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress })
 
     return [buffer];
 }
@@ -62,7 +62,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         return [`错误: ${serverNameFullList[mainServer]} 活动不存在或数据不足`];
     }
     //if (cutoffEventTop.status != "in_progress") {
-        //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
+    //return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
     //}
     const finalRanking = cutoffEventTop.getLatestRanking();
     if (day) {
@@ -84,7 +84,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         let min = 0;
         let max = Infinity;
         if (!limit || typeof limit !== "string") {
-            return {min, max};
+            return { min, max };
         }
         let str = limit.trim()
             .replace(/＞/g, ">")
@@ -146,8 +146,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         }
         if (list.length > 0) {
             all.push(drawDatablock({ list, maxWidth: widthMax }))
-        }
-        else
+        } else
             return [`玩家当前不在${serverNameFullList[mainServer]}: 活动${eventId}前十名里`]
     }
     const playerRating = getRatingByPlayer(cutoffEventTop.points, playerId)
@@ -180,21 +179,22 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             }
             // 分数变动且间隔合理(bd防炸)
             if ((playerRating[i].value != playerRating[i + 1].value) && (playerRating[i].time - playerRating[i + 1].time < 5 * 60 * 1000)) {
-                const mid = new Date((playerRating[i + 1].time + playerRating[i].time) / 2), score = playerRating[i].value - playerRating[i + 1].value
-                if (score > max || score < min ) continue;
+                const mid = new Date((playerRating[i + 1].time + playerRating[i].time) / 2),
+                    score = playerRating[i].value - playerRating[i + 1].value
+                if (score > max || score < min) continue;
                 count += 1
-                const timeImage = drawList({ text: `${mid.toTimeString().slice(0, 5)}`})
+                const timeImage = drawList({ text: `${mid.toTimeString().slice(0, 5)}` })
                 const ctx = timeImage.getContext('2d')
                 ctx.font = "18px old,Microsoft Yahei"
                 ctx.fillText(`${mid.getMonth() + 1}.${mid.getDate()}`, 50, 13)
                 imageList.push(drawListMerge([
-                  timeImage,
-                  drawList({ text: `${score}`})], widthMax / 2))
+                    timeImage,
+                    drawList({ text: `${score}` })], widthMax / 2))
                 // list.push(line)
             }
         }
         if (count == 0) {
-            list.push(drawList({text: '数据不足'}))
+            list.push(drawList({ text: '数据不足' }))
         } else {
             imageList.reverse()
             const leftImage = [], rightImage = []
@@ -211,7 +211,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
                 rightImage.pop()
             list.push(drawListMerge([stackImage(leftImage), stackImage(rightImage)], widthMax))
         }
-        all.push(drawDatablock({ list, topLeftText: day ? `玩家于day${day}的分数变化` : `最近${maxCount}次分数变化`}))
+        all.push(drawDatablock({ list, topLeftText: day ? `玩家于day${day}的分数变化` : `最近${maxCount}次分数变化` }))
     }
     //CP活cp情况统计
     const nowEvent = new Event(eventId);
@@ -250,7 +250,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             while (j < extendedRating.length) {
                 if (extendedRating[j].value === -1) {
                     crossedSeparator = true
-                } else if (extendedRating.at(j-1)?.time - extendedRating.at(j)?.time > 5 * 60 * 1000) {
+                } else if (extendedRating.at(j - 1)?.time - extendedRating.at(j)?.time > 5 * 60 * 1000) {
                     crossedSeparator = true;
                     if (extendedRating[j].value >= 0) break;
                 } else if (extendedRating[j].value >= 0) break
@@ -352,34 +352,34 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
 
         cpLists.push(drawListMerge([
             drawList({ text: '估计协力次数' }),
-            drawList({ text: `${Math.floor(multiPlayTimes)}` }),
+            drawList({ text: `${Math.floor(multiPlayTimes)}` })
         ], widthMax))
         cpLists.push(line)
         cpLists.push(drawListMerge([
-            drawList({ text: '估计协力CP'}),
-            drawList({ text: `${Math.floor(multiPlayCPs)}` }),
+            drawList({ text: '估计协力CP' }),
+            drawList({ text: `${Math.floor(multiPlayCPs)}` })
         ], widthMax));
         cpLists.push(line)
         const avgLivePoints = Math.floor(avg(livePoint.length > 50 ? livePoint.slice(0, 50) : livePoint));
         const avgCPPoints = Math.floor(avg(cpPoints.length > 50 ? cpPoints.slice(0, 50) : cpPoints));
         cpLists.push(drawListMerge([
             drawList({ text: '把均pt(协力/CP)' }),
-            drawList({ text: `${Math.floor(avg(livePoint))} / ${Math.floor(avg(cpPoints))}` }),
+            drawList({ text: `${Math.floor(avg(livePoint))} / ${Math.floor(avg(cpPoints))}` })
         ], widthMax));
         cpLists.push(line)
         cpLists.push(drawListMerge([
             drawList({ text: '把均pt(近50把)' }),
-            drawList({ text: `${avgLivePoints} / ${avgCPPoints}` }),
+            drawList({ text: `${avgLivePoints} / ${avgCPPoints}` })
         ], widthMax))
         cpLists.push(line)
         cpLists.push(drawListMerge([
             drawList({ text: '估计清CP次数' }),
-            drawList({ text: `${Math.floor(challengePlayTimes)}` }),
+            drawList({ text: `${Math.floor(challengePlayTimes)}` })
         ], widthMax))
         cpLists.push(line)
         cpLists.push(drawListMerge([
-            drawList({ text: '估计CP积累'} ),
-            drawList({ text: `${Math.floor(changeCPs)}` }),
+            drawList({ text: '估计CP积累' }),
+            drawList({ text: `${Math.floor(changeCPs)}` })
         ], widthMax))
         all.push(drawDatablock({ list: cpLists, topLeftText: `CP追踪` }))
     }
@@ -392,7 +392,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         for (const a of timeList) {
             const begin = now - a * 60 * 60 * 1000
             const st = new Date(begin), ed = new Date(now)
-            const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
+            const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}` })
             const offset = Math.floor((now / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60) - Math.floor((begin / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60)
             // console.log(st.getTimezoneOffset())
             if (offset > 0) {
@@ -425,7 +425,7 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
             list.push(line)
         }
         list.pop()
-        all.push(drawDatablock({ list, topLeftText: `近期统计数据`}))
+        all.push(drawDatablock({ list, topLeftText: `近期统计数据` }))
     }
 
 
@@ -503,11 +503,11 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
         if (playerRating[i].value === tmpValue && i > 0) continue;
         else if ((tmpTime === -1 && (playerRating[i].value >= 0)) ||
             // bd防炸
-            (playerRating.at(i).time - playerRating.at(i+1).time > 5 * 60 * 1000))
+            (playerRating.at(i).time - playerRating.at(i + 1).time > 5 * 60 * 1000))
             [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
         else {
             if (playerRating[i].time - tmpTime > limitTime) {
-                sleep.push({start: tmpTime, end: playerRating[i].time});
+                sleep.push({ start: tmpTime, end: playerRating[i].time });
             }
             [tmpTime, tmpValue] = [playerRating[i].time, playerRating[i].value];
         }
@@ -516,9 +516,9 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
     const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time % 60}min`
     if (sleep.length > 0) {
 
-        for (const {start, end} of sleep) {
+        for (const { start, end } of sleep) {
             const st = new Date(start), ed = new Date(end)
-            const timeImage = drawList({text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}`})
+            const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}` })
             const offset = Math.floor((ed.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60) - Math.floor((st.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60)
             // console.log(st.getTimezoneOffset())
             if (offset > 0) {
@@ -535,9 +535,9 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
             };
 
             list.push(drawListMerge([
-                drawList({text: `${formatDate(ed)}`}),
+                drawList({ text: `${formatDate(ed)}` }),
                 timeImage,
-                drawList({text: toTimeStr(diff)})
+                drawList({ text: toTimeStr(diff) })
             ], widthMax))
             list.push(line)
         }
@@ -547,7 +547,7 @@ export async function drawTopSleepStat(eventId: number, playerId: number, tier: 
             drawList({ text: '总计: ' }),
             drawList({ text: toTimeStr(Math.floor(totalSleepTime / (1000 * 60))) }),
             drawList({ text: '平均每天: ' }),
-            drawList({ text: toTimeStr(Math.floor(24 * 60 * totalSleepTime / (playerRating[0].time - nowEvent.startAt[mainServer]))) }),
+            drawList({ text: toTimeStr(Math.floor(24 * 60 * totalSleepTime / (playerRating[0].time - nowEvent.startAt[mainServer]))) })
         ], widthMax))
     } else {
         list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
@@ -630,7 +630,7 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
         list.push(drawListMerge(row, widthMax, true, "top", drawWidth))
     })
 
-    all.push(drawDatablock({list}));
+    all.push(drawDatablock({ list }));
     var event = new Event(eventId);
     all.push(await drawEventDatablock(event, [mainServer]));
 
@@ -750,7 +750,15 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
 
     let list = [];
     const line = drawDottedLine({
-        width: totalWidth, height: 30, startX: 5, startY: 15, endX: totalWidth - 5, endY: 15, radius: 2, gap: 10, color: "#a8a8a8"
+        width: totalWidth,
+        height: 30,
+        startX: 5,
+        startY: 15,
+        endX: totalWidth - 5,
+        endY: 15,
+        radius: 2,
+        gap: 10,
+        color: "#a8a8a8"
     });
 
     list.push(drawListMerge(header, widthMax, false, "top", finalDrawWidth));
@@ -834,7 +842,7 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
     let lastActiveTime: number | null = null;
     let flag = false;
     for (let i = playerRating.length - 1; i >= 0; i--) {
-        const {time, value} = playerRating[i];
+        const { time, value } = playerRating[i];
         if (value === -1 || i === 0) {
             if (flag) {
                 if (tmpTimes > 0)
@@ -878,7 +886,7 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
     const toTimeStr = (time: number) => `${Math.floor(time / 60) > 0 ? `${Math.floor(time / 60)}h` : ''}${time % 60}min`
     if (run.length > 0) {
         let totalRunTime = 0;
-        for (const {startTime, startValue, endTime, endValue, playTimes} of run) {
+        for (const { startTime, startValue, endTime, endValue, playTimes } of run) {
             const st = new Date(startTime), ed = new Date(endTime)
             const timeImage = drawList({ text: `${st.toTimeString().slice(0, 5)}~${ed.toTimeString().slice(0, 5)}` })
             const offset = Math.floor((ed.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60) - Math.floor((st.getTime() / 1000 / 60 - st.getTimezoneOffset()) / 24 / 60)
@@ -896,28 +904,28 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
             };
 
             list.push(drawListMerge([
-                drawList({  text: `${formatDate(ed)}` }),
+                drawList({ text: `${formatDate(ed)}` }),
                 timeImage,
                 drawList({ text: String(playTimes) }),
                 drawList({ text: String(Math.floor((endValue - startValue) / playTimes)) }),
-                drawList({ text: String(endValue - startValue) }),
+                drawList({ text: String(endValue - startValue) })
             ], widthMax, false, "top", [widthMax * 0.15, widthMax * 0.3, widthMax * 0.15, widthMax * 0.15, widthMax * 0.25]))
             list.push(line)
         }
         const nowEvent = new Event(eventId);
         list.push(line)
         list.push(drawListMerge([
-            drawList({ text: '总计: '} ),
-            drawList({ text: toTimeStr(Math.floor(totalRunTime / (1000 * 60)))} ),
-            drawList({ text: '平均每天: '} ),
-            drawList({ text: toTimeStr(Math.floor(24 * 60 * totalRunTime / (playerRating[0].time - nowEvent.startAt[mainServer])))} ),
+            drawList({ text: '总计: ' }),
+            drawList({ text: toTimeStr(Math.floor(totalRunTime / (1000 * 60))) }),
+            drawList({ text: '平均每天: ' }),
+            drawList({ text: toTimeStr(Math.floor(24 * 60 * totalRunTime / (playerRating[0].time - nowEvent.startAt[mainServer]))) })
         ], widthMax))
     } else {
-        list.push(drawListMerge([drawList({ text: '数据不足'} )], widthMax))
+        list.push(drawListMerge([drawList({ text: '数据不足' })], widthMax))
     }
     //折线图
     list.push(await drawCutOffEventTopSingleChart(cutoffEventTop, false, playerId, mainServer))
-    all.push(drawDatablock({ list, topLeftText: `稼动时间统计`} ))
+    all.push(drawDatablock({ list, topLeftText: `稼动时间统计` }))
 
 
     all.push(await drawEventDatablock(event, [mainServer]));
@@ -933,7 +941,7 @@ export function getRatingByPlayer(points: Array<{
     value: number
 }>, playerId: number) {
     const map = {}
-    let tmpTime = -1,counts=0;
+    let tmpTime = -1, counts = 0;
     for (const info of points) {
         //极大性能开销，弃用
         //if (points.filter(p => p.time === info.time).length !== 10) continue;
@@ -941,9 +949,9 @@ export function getRatingByPlayer(points: Array<{
             map[info.time] = -1
         if (info.uid == playerId)
             map[info.time] = info.value
-        if (info.time !== tmpTime){
+        if (info.time !== tmpTime) {
             //防bd插入单独数据(2025.11.4 03:00:01仅出现t1玩家数据 导致其他t10玩家point列表出现-1)
-            if (tmpTime !== -1 && counts !== 10){
+            if (tmpTime !== -1 && counts !== 10) {
                 delete map[tmpTime];
             }
             tmpTime = info.time;
@@ -966,7 +974,7 @@ export function getRatingByPlayer(points: Array<{
 export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
     const limitPoints = date ? cutoffEventTop.points.filter(item => item.time <= date.getTime()) : cutoffEventTop.points;
     const now = limitPoints.at(-1).time;
-    const top10List: { uid: number, point: number }[] = limitPoints.slice(-10).map(({uid, value}) => ({
+    const top10List: { uid: number, point: number }[] = limitPoints.slice(-10).map(({ uid, value }) => ({
         uid,
         point: value
     }));
@@ -1021,7 +1029,7 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTim
             lastTime: playerTimesInfo.lastTime > 0 ? `${Math.round((playerTimesInfo.lastTime - now) / (60 * 1000))}min` : '',
             averagePoints: playerTimesInfo.count > 0 ? Math.floor(playerSpeedInfo.speed / playerTimesInfo.count) : 0,
             nowTime: fmt.format(new Date(now)),
-            oldTime: fmt.format(new Date(old_time)),
+            oldTime: fmt.format(new Date(old_time))
         })
     })
     return top10_ranking;
@@ -1084,10 +1092,10 @@ function computeSpeed(
     const fallbackValue = top10_Old.at(-1)?.value ?? 0;
     //创建map集合方便查询
     const oldValueMap = new Map<number, number>();
-    for (const {uid, value} of top10_Old) {
+    for (const { uid, value } of top10_Old) {
         oldValueMap.set(uid, value);
     }
-    for (const {uid, point} of top10List) {
+    for (const { uid, point } of top10List) {
         const oldPoint = oldValueMap.get(uid) ?? fallbackValue;
         speed.push({ uid, speed: point - oldPoint, speedRanking: 0 });
     }

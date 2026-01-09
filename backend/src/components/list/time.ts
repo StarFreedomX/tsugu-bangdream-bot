@@ -12,6 +12,7 @@ interface timeInListOptions {
     eventId?: number;
     estimateCNTime?: boolean;
 }
+
 export async function drawTimeInList({
     key,
     content,
@@ -37,6 +38,7 @@ export async function drawTimeInList({
     var canvas = await drawListByServerList(formatedTimeList, key, displayedServerList)
     return canvas
 }
+
 //获取当前活动与查询活动的大致时间差(国服)
 //注: 返回的并非时间差，而是活动预计开始的时间戳
 export function GetProbablyTimeDifference(eventId: number, currentEvent: Event): number {
@@ -84,8 +86,7 @@ export function changeTimefomant(timeStamp: number | null) {//时间戳到年月
     if (date.getMinutes() < 10) {
         nMinutes = "0" + date.getMinutes().toString()
         if (date.getMinutes() == 0) { nMinutes = "00" }
-    }
-    else {
+    } else {
         nMinutes = date.getMinutes().toString()
     }
     var temp = date.getFullYear().toString() + "年" + (date.getMonth() + 1).toString() + "月" + date.getDate().toString() + "日 " + date.getHours().toString() + ":" + nMinutes
@@ -121,8 +122,7 @@ export function changeTimefomantMonthDay(timeStamp: number | null) {//获取生�
     if (date.getMinutes() < 10) {
         nMinutes = "0" + date.getMinutes().toString()
         if (date.getMinutes() == 0) { nMinutes = "00" }
-    }
-    else {
+    } else {
         nMinutes = date.getMinutes().toString()
     }
     var temp = (date.getMonth() + 1).toString() + "月" + date.getDate().toString() + "日 "

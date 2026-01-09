@@ -54,22 +54,22 @@ export function getUserPlayerByUser(tsuguUser: tsuguUser, server?: Server): user
     const userPlayerList = tsuguUser.userPlayerList;
     //如果用户未绑定角色
     if (userPlayerList.length == 0) {
-      throw new Error('用户未绑定player');
+        throw new Error('用户未绑定player');
     }
     //如果index的player在主服务器上，直接返回
     if (tsuguUser.userPlayerList[tsuguUser.userPlayerIndex].server == server) {
-      return userPlayerList[tsuguUser.userPlayerIndex];
+        return userPlayerList[tsuguUser.userPlayerIndex];
     }
     //如果index的player不在主服务器上，遍历查找第一个在主服务器上的player
     for (let i = 0; i < userPlayerList.length; i++) {
-      const userPlayerInList: userPlayerInList = userPlayerList[i];
-      if (userPlayerInList.server == server) {
-        return userPlayerInList;
-      }
+        const userPlayerInList: userPlayerInList = userPlayerList[i];
+        if (userPlayerInList.server == server) {
+            return userPlayerInList;
+        }
     }
     //如果没有在主服务器上的player
     throw new Error('用户在对应服务器上未绑定player');
-  }
+}
 
 export interface Channel {
     tsuguGacha: boolean
@@ -82,8 +82,8 @@ export interface Config {
     backendUrl: string,
     RemoteDBSwitch: boolean,
     RemoteDBUrl: string,
-  
+
     //noSpace: boolean,
     reply: boolean,
     at: boolean,
-  }
+}
