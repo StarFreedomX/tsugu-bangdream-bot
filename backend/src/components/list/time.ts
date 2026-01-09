@@ -12,6 +12,7 @@ interface timeInListOptions {
     eventId?: number;
     estimateCNTime?: boolean;
 }
+
 export async function drawTimeInList({
     key,
     content,
@@ -37,6 +38,7 @@ export async function drawTimeInList({
     var canvas = await drawListByServerList(formatedTimeList, key, displayedServerList)
     return canvas
 }
+
 //获取当前活动与查询活动的大致时间差(国服)
 //注: 返回的并非时间差，而是活动预计开始的时间戳
 export function GetProbablyTimeDifference(eventId: number, currentEvent: Event): number {
@@ -45,18 +47,18 @@ export function GetProbablyTimeDifference(eventId: number, currentEvent: Event):
 
     // 查询已经进行过的活动并加入偏移量
     const eventsData = mainAPI['events'];
-    const eventsRecord: Record<number,Event> = {};
+    const eventsRecord: Record<number, Event> = {};
     eventsRecord[currentEvent.eventId] = currentEvent;
     const completedEvent =
         Object.keys(eventsData).map(Number).filter((theEventId) => {
             // 活动ID层过滤
-            if(theEventId <= currentEvent.eventId || theEventId >= eventId) return false;
+            if (theEventId <= currentEvent.eventId || theEventId >= eventId) return false;
             const theEvent = new Event(theEventId);
             // 防止undefined
             if (!theEvent.startAt[Server.jp] || !tempEvent.startAt[Server.jp] || !currentEvent.startAt[Server.jp]) return false;
             // 活动时间层过滤
-            if(theEvent.startAt[Server.jp] <= currentEvent.startAt[Server.jp]
-              || theEvent.startAt[Server.jp] >= tempEvent.startAt[Server.jp]) return false;
+            if (theEvent.startAt[Server.jp] <= currentEvent.startAt[Server.jp]
+                || theEvent.startAt[Server.jp] >= tempEvent.startAt[Server.jp]) return false;
             eventsRecord[theEventId] = theEvent;
             return !!(theEvent.startAt[Server.cn]);
         });
@@ -64,7 +66,7 @@ export function GetProbablyTimeDifference(eventId: number, currentEvent: Event):
     // 已完成活动需要调整的时间偏移（为负数），包括活动时间和活动前的无邦日
     const finishOffset = completedEvent.reduce((acc, cur) => {
         const theEvent = eventsRecord[cur];
-        const preEvent = eventsRecord[cur-1];
+        const preEvent = eventsRecord[cur - 1];
         return acc + (preEvent.endAt[Server.jp] - theEvent.endAt[Server.jp]);
     }, 0)
 
@@ -72,7 +74,7 @@ export function GetProbablyTimeDifference(eventId: number, currentEvent: Event):
     const eventLengthOffset = (
         occupiedDays(currentEvent.startAt[Server.cn], currentEvent.endAt[Server.cn])
         - occupiedDays(currentEvent.startAt[Server.jp], currentEvent.endAt[Server.jp])
-    )*24*3600*1000;
+    ) * 24 * 3600 * 1000;
 
     const timeStamp = tempEvent.startAt[Server.jp] + (currentEvent.startAt[Server.cn] - currentEvent.startAt[Server.jp]) + finishOffset + eventLengthOffset;
     return timeStamp;
@@ -87,8 +89,7 @@ export function changeTimefomant(timeStamp: number | null) {//时间戳到年月
     if (date.getMinutes() < 10) {
         nMinutes = "0" + date.getMinutes().toString()
         if (date.getMinutes() == 0) { nMinutes = "00" }
-    }
-    else {
+    } else {
         nMinutes = date.getMinutes().toString()
     }
     var temp = date.getFullYear().toString() + "年" + (date.getMonth() + 1).toString() + "月" + date.getDate().toString() + "日 " + date.getHours().toString() + ":" + nMinutes
@@ -124,8 +125,7 @@ export function changeTimefomantMonthDay(timeStamp: number | null) {//获取生�
     if (date.getMinutes() < 10) {
         nMinutes = "0" + date.getMinutes().toString()
         if (date.getMinutes() == 0) { nMinutes = "00" }
-    }
-    else {
+    } else {
         nMinutes = date.getMinutes().toString()
     }
     var temp = (date.getMonth() + 1).toString() + "月" + date.getDate().toString() + "日 "

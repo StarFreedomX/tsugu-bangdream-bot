@@ -12,7 +12,7 @@ import { songMetaRouter } from '@/routers/songMeta';
 import { cutoffDetailRouter } from '@/routers/cutoffDetail';
 import { cutoffListOfRecentEventRouter } from '@/routers/cutoffListOfEvent';
 import { cutoffAllRouter } from '@/routers/cutoffAll';
-import { songChartRouter } from '@/routers/songChart'; 1
+import { songChartRouter } from '@/routers/songChart';
 import { userRouter } from '@/routers/user'
 import { stationRouter } from '@/routers/station'
 import { eventPreviewRouter } from '@/routers/article/eventPreview'
@@ -68,8 +68,7 @@ app.use('/searchComposition', searchCompositionRouter);
 if (process.env.LOCAL_DB == 'true') {
     app.use('/user', userRouter);
     app.use('/station', stationRouter);
-}
-else {
+} else {
     app.use('/user', (req, res) => {
         res.status(404).send({
             status: 'fail',
