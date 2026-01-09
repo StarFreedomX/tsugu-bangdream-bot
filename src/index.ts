@@ -444,9 +444,9 @@ export function apply(ctx: Context, config: Config) {
       return (paresMessageList(list))
     })
 
-  ctx.command('十分速度 [serverName:string]')
-    .alias('十分表')
-    .action(async ({ session }, serverName) => {
+  ctx.command('分速表 [serverName:string]')
+    .option('time', '-t <time:number> 指定时间范围，默认60(单位min)')
+    .action(async ({ session, options }, serverName) => {
       const tsuguUserData = await observeUserTsugu(session)
       let mainServer: Server = tsuguUserData.mainServer
       if (serverName) {
@@ -456,7 +456,7 @@ export function apply(ctx: Context, config: Config) {
         }
         mainServer = serverFromServerNameFuzzySearch
       }
-      const list = await commandTopTenMinuteSpeed(config, mainServer)
+      const list = await commandTopTenMinuteSpeed(config, mainServer, options.time)
       return (paresMessageList(list))
     })
   ctx.command('查稼动 <playerId:string> [eventId] [serverName:string]')

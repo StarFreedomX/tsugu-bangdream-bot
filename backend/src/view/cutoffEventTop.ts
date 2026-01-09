@@ -638,7 +638,7 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
     return [buffer];
 }
 
-export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false) {
+export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false, time = 60) {
     const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
     await cutoffEventTop.initFull(0);
     if (!cutoffEventTop.isExist) {
@@ -648,115 +648,126 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         return [`当前主服务器: ${serverNameFullList[mainServer]}没有进行中的活动`]
     }
 
-
     const all = [];
     const widthMax = 3000;
-    all.push(drawTitle('十分速度', `${serverNameFullList[mainServer]}`));
-    let list = []
-    //const lastTime = cutoffEventTop.points[0]?.time || cutoffEventTop.startAt;
-    const rankingInTenMinute = cutoffEventTop.points.slice(-11 * 10);
-    const top10SpeedRankingData: {
-        ranking: number,
-        uid: number,
-        name: string,
-        point: number,
-        [add: number]: number,
-    }[] = [];
+    all.push(drawTitle('分速表', `${serverNameFullList[mainServer]}`));
+
+    const now = Date.now();
+    const startTimeLimit = now - (time * 60 * 1000);
+    const allPointsInRange = cutoffEventTop.points.filter(p => p.time >= startTimeLimit);
+
+    const allTimeStamps = [];
+    for (const p of allPointsInRange) {
+        if (!allTimeStamps.includes(p.time)) allTimeStamps.push(p.time);
+    }
+    const displayTimeStamps = allTimeStamps;
+
+    const bufferTime = startTimeLimit - (30 * 60 * 1000);
+    const calculationSource = cutoffEventTop.points.filter(p => p.time >= bufferTime);
+
+    const players = [];
+    const latestRanking = cutoffEventTop.getLatestRanking().slice(0, 10);
+
     for (let i = 0; i < 10; i++) {
-        let {uid, point} = cutoffEventTop.getLatestRanking()[i]
-        const playerRating: { time: number, value: number }[] = getRatingByPlayer(rankingInTenMinute, uid);
-        //console.log(playerRating)
+        const { uid, point } = latestRanking[i];
+        const name = cutoffEventTop.getUserNameById(uid);
+        const playerRating = getRatingByPlayer(calculationSource, uid);
 
-        const add: number[] = []
-        for (let j = 0; j < playerRating.length - 1; j++) {
-            if (playerRating[j].value > 0 && playerRating[j + 1].value > 0) {
-                add.push(playerRating[j].value - playerRating[j + 1].value)
+        const speeds: string[] = [];
+        displayTimeStamps.forEach(currentTime => {
+            const currentIdx = playerRating.findIndex(r => r.time === currentTime);
+            if (currentIdx === -1 || playerRating[currentIdx].value < 0) {
+                speeds.push("---");
+                return;
+            }
+
+            const current = playerRating[currentIdx];
+            let prevValidPoint = null;
+            let isGap = false;
+
+            // 回溯查找逻辑：寻找当前点之前的第一个正数点
+            for (let k = currentIdx + 1; k < playerRating.length; k++) {
+                if (playerRating[k].value >= 0) {
+                    prevValidPoint = playerRating[k];
+                    // 如果不是紧邻的下一个点，说明中间有间断
+                    if (k > currentIdx + 1) isGap = true;
+                    break;
+                }
+            }
+
+            if (prevValidPoint) {
+                const diff = current.value - prevValidPoint.value;
+                const finalDiff = diff < 0 ? 0 : diff;
+                // 如果是回溯找到的，加上括号标记间断检测
+                speeds.push(isGap ? `(+${finalDiff})` : String(finalDiff));
             } else {
-                add.push(0)
+                // 找不到之前的数据
+                speeds.push("---");
             }
-        }
-        top10SpeedRankingData[i] = {
-            ranking: i + 1,
-            uid: uid,
-            name: cutoffEventTop.getUserNameById(uid),
-            point: point,
-        }
-        add.reverse().forEach((value, index) => {
-            //这里的z是为了确保顺序放的
-            top10SpeedRankingData[i][`zzzzz${index}`] = value;
-        })
+        });
+
+        players.push({
+            name: name,
+            currentPt: point,
+            speeds: speeds
+        });
     }
 
+    const headerStringArray = ['时间', ...players.map(p => p.name)];
+    const header: Canvas[] = headerStringArray.map(text =>
+        drawRoundedRectWithText({ text: text, textSize: 30 })
+    );
 
-    const formatToHHMM = (time: number) => {
-        const date = new Date(time);
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
+    const ptRow: Canvas[] = [drawList({ text: '当前分数' })];
+    players.forEach(p => {
+        ptRow.push(drawList({ text: String(p.currentPt) }));
+    });
+
+    const tableRows: Canvas[][] = [];
+    let colWidths = new Array(headerStringArray.length).fill(0);
+    header.forEach((canvas, idx) => { colWidths[idx] = Math.max(colWidths[idx], canvas.width); });
+    ptRow.forEach((canvas, idx) => { colWidths[idx] = Math.max(colWidths[idx], canvas.width); });
+
+    for (let tIdx = displayTimeStamps.length - 1; tIdx >= 0; tIdx--) {
+        const row: Canvas[] = [];
+        const timeStr = new Date(displayTimeStamps[tIdx]).toTimeString().slice(0, 5);
+
+        const timeImg = drawList({ text: timeStr });
+        row.push(timeImg);
+        colWidths[0] = Math.max(colWidths[0], timeImg.width);
+
+        players.forEach((player, playerIdx) => {
+            const val = player.speeds[tIdx] ?? "---";
+            const speedImg = drawList({ text: val });
+            row.push(speedImg);
+            colWidths[playerIdx + 1] = Math.max(colWidths[playerIdx + 1], speedImg.width);
+        });
+        tableRows.push(row);
     }
-    const filterTime = (data: { time: number, uid: number, value: number }[]) => {
-        const timeList = [];
-        for (const {time} of data) {
-            if (!timeList.includes(time)) {
-                timeList.push(time);
-            }
-        }
-        return timeList.slice(1).map(item => new Date(item).toTimeString().slice(0, 5));
-    }
-    //console.log(rankingInTenMinute)
-    const minuteStrs = filterTime(rankingInTenMinute)
-    const headerStringArray = ['排名', 'uid', 'id', '分数', ...minuteStrs]
-    //const headerStringArray = ['順位', 'uid', 'id', 'ポイント', '上との差', compareName ? `${compareName}さんと差` : null, `${time}時速`, '時速ランキング', '今の時間', '1hスタート時間']
-    const top10RankingTable: Canvas[][] = Array.from({ length: 10 }, () => []);
-    const drawWidth = []
-    const header: Canvas[] = [];
-    headerStringArray.forEach((value, index) => {
-        if (!value) return header.push(null);
-        header.push(drawRoundedRectWithText({ text: value, textSize: 30 }))
-    })
-    //对每一个字段进行遍历
-    Object.keys(top10SpeedRankingData[0]).forEach((value, index) => {
-        //若未指定玩家那么直接跳过
-        if (!header[index]) return;
-        //存储宽度
-        const width = [];
-        const height = [];
-        //对每一个排名进行遍历
-        for (let i = 0; i < 10; i++) {
 
-            //绘制字段图并存储各个宽度
-            const img = drawList({ text: String(top10SpeedRankingData[i][value] || '---') });
-            width.push(img.width);
-            height.push(img.height);
-            top10RankingTable[i].push(img);
-        }
-        const maxWid = Math.max(header[index].width, ...width);
-        drawWidth.push(maxWid + 20);
-    })
-    const totalWidth = drawWidth.reduce((sum, w) => sum + w, 0);
-    const line: Canvas = drawDottedLine({
-        width: totalWidth,
-        height: 30,
-        startX: 5,
-        startY: 15,
-        endX: totalWidth - 5,
-        endY: 15,
-        radius: 2,
-        gap: 10,
-        color: "#a8a8a8"
-    })
-    //console.log(drawWidth)
-    list.push(drawListMerge(header.filter(Boolean), widthMax, false, "top", drawWidth))
-    top10RankingTable.forEach((row) => {
-        list.push(line)
-        list.push(drawListMerge(row, widthMax, true, "top", drawWidth))
-    })
+    const finalDrawWidth = colWidths.map(w => w + 20);
+    const totalWidth = finalDrawWidth.reduce((sum, w) => sum + w, 0);
 
-    all.push(drawDatablock({list}));
-    var event = new Event(eventId);
-    all.push(await drawEventDatablock(event, [mainServer]));
+    let list = [];
+    const line = drawDottedLine({
+        width: totalWidth, height: 30, startX: 5, startY: 15, endX: totalWidth - 5, endY: 15, radius: 2, gap: 10, color: "#a8a8a8"
+    });
 
-    let buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress })
+    list.push(drawListMerge(header, widthMax, false, "top", finalDrawWidth));
+    list.push(line);
+    list.push(drawListMerge(ptRow, widthMax, true, "top", finalDrawWidth));
+    list.push(line);
+    list.push(line);
+
+    tableRows.forEach((row) => {
+        list.push(drawListMerge(row, widthMax, true, "top", finalDrawWidth));
+        list.push(line);
+    });
+
+    all.push(drawDatablock({ list }));
+    all.push(await drawEventDatablock(new Event(eventId), [mainServer]));
+
+    let buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress });
     return [buffer];
 }
 
