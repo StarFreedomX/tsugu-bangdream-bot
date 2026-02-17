@@ -15,16 +15,17 @@ router.post(
   [
     body('mainServer').custom(isServer),
     body('compress').optional().isBoolean(),
+    body('allPlayer').optional().isBoolean(),
     body('time').optional().isInt(),
     body('date').optional().isInt(),
   ],
   middleware,
   async (req: Request, res: Response) => {
 
-    const { mainServer, compress, time, date } = req.body;
+    const { mainServer, compress, time, date, allPlayer } = req.body;
 
     try {
-      const result = await commandTopTenMinuteSpeed(getServerByServerId(mainServer), compress, date ? new Date(date) : undefined, time);
+      const result = await commandTopTenMinuteSpeed(getServerByServerId(mainServer), compress, date ? new Date(date) : undefined, time, allPlayer);
       res.send(listToBase64(result));
     } catch (e) {
       console.log(e);
@@ -33,11 +34,11 @@ router.post(
   }
 );
 
-export async function commandTopTenMinuteSpeed(mainServer: Server, compress: boolean, date: Date, time?: number): Promise<Array<Buffer | string>> {
+export async function commandTopTenMinuteSpeed(mainServer: Server, compress: boolean, date: Date, time?: number, allPlayer?: boolean): Promise<Array<Buffer | string>> {
   const targetTime = new Date(date);
   targetTime.setHours(time)
   const eventId = getPresentEvent(mainServer, +targetTime).eventId
-  return await drawTopTenMinuteSpeed(eventId, mainServer, compress, date, time);
+  return await drawTopTenMinuteSpeed(eventId, mainServer, compress, date, time, allPlayer);
 }
 
 export { router as topTenMinuteSpeedRouter };

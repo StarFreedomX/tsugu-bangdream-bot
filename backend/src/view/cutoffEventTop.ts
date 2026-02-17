@@ -639,7 +639,7 @@ export async function drawTopRateRanking(eventId: number, mainServer: Server, co
     return [buffer];
 }
 
-export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false, date: Date, time = 60) {
+export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server, compress: boolean = false, date: Date, time = 60, allPlayer = false) {
     const cutoffEventTop = new CutoffEventTop(eventId, mainServer);
     await cutoffEventTop.initFull(0);
 
@@ -666,22 +666,44 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
     const bufferTime = startTimeLimit - (30 * 60 * 1000);
     const calculationSource = cutoffEventTop.points.filter(p => p.time >= bufferTime && p.time <= targetTime);
 
-    let rankingAtTime: { uid: number; value: number }[] = [];
+    let targetUids: number[];
+    let rankingMap = new Map<number, number>();
+
+    let topTenUids = new Set<number>();
+    let currentRanking: { uid: number; value: number }[] = [];
     if (!date) {
-        rankingAtTime = cutoffEventTop.getLatestRanking().slice(0, 10).map(r => ({ uid: r.uid, value: r.point }));
+        currentRanking = cutoffEventTop.getLatestRanking().slice(0, 10).map(r => ({ uid: r.uid, value: r.point }));
     } else {
         const sortedPoints = [...cutoffEventTop.points].sort((a, b) => a.time - b.time);
         const group = findTargetTimeRankingGroup(sortedPoints, targetTime);
-        rankingAtTime = group.sort((a, b) => b.value - a.value).slice(0, 10);
+        currentRanking = group.sort((a, b) => b.value - a.value).slice(0, 10);
+    }
+    topTenUids = new Set(currentRanking.map(r => r.uid));
+
+    if (allPlayer) {
+        // 获取时间范围内所有出现过的玩家
+        targetUids = Array.from(new Set(allPointsInRange.map(p => p.uid)));
+        targetUids.forEach(uid => {
+            const userPoints = allPointsInRange
+                .filter(p => p.uid === uid)
+                .sort((a, b) => b.time - a.time);
+            rankingMap.set(uid, userPoints.length > 0 ? userPoints[0].value : 0);
+        });
+        // 根据最后一次分数降序排列
+        targetUids.sort((a, b) => (rankingMap.get(b) || 0) - (rankingMap.get(a) || 0));
+    } else {
+        targetUids = Array.from(topTenUids);
+        currentRanking.forEach(r => rankingMap.set(r.uid, r.value));
+        targetUids = currentRanking.map(r => r.uid);
     }
 
-    if (rankingAtTime.length === 0) {
+    if (targetUids.length === 0) {
         return [`错误: 在指定时间未找到有效的排名数据`];
     }
 
     const players = [];
-    for (let i = 0; i < rankingAtTime.length; i++) {
-        const { uid, value: point } = rankingAtTime[i];
+    for (const uid of targetUids) {
+        const point = rankingMap.get(uid) || 0;
         const name = cutoffEventTop.getUserNameById(uid);
         const playerRating = getRatingByPlayer(calculationSource, uid);
 
@@ -713,11 +735,11 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
                 speeds.push("---");
             }
         });
-        players.push({ name, currentPt: point, speeds });
+        // 额外记录 UID 用于后续判断括号
+        players.push({ uid, name, currentPt: point, speeds });
     }
 
-    // --- 同车识别逻辑 ---
-    const rooms = identifyRooms(players, 0.9); // 0.9 为模糊度调节常量
+    const rooms = identifyRooms(players, 0.9);
     const colorMap = new Map<string, string>();
     rooms.forEach((room, index) => {
         const c = presetColorList[index % presetColorList.length];
@@ -725,22 +747,25 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         room.forEach(playerName => colorMap.set(playerName, colorStr));
     });
 
-    // 构建表头（如果是同车，后续上色）
+    // 名字表头
     const headerStringArray = ['时间', ...players.map(p => p.name)];
     const header: Canvas[] = headerStringArray.map((text, idx) => {
         const playerName = idx === 0 ? null : players[idx - 1].name;
         const color = colorMap.get(playerName) || '#505050';
-        // return drawRoundedRectWithText({ text, textSize: 30, color, autoWrap: true, maxWidth: 200 });
         return drawList({ text, textSize: 30, color, autoWrap: true, maxWidth: 250 });
     });
 
+    // 分数行，榜外玩家加括号
     const ptRow: Canvas[] = [drawList({ text: (date ?? new Date()).toLocaleDateString() })];
     players.forEach(p => {
-        ptRow.push(drawList({ text: String(p.currentPt) }));
+        // 如果开启了 allPlayer 且该玩家不在 Top 10 集合中，则加括号
+        const showBracket = allPlayer && !topTenUids.has(p.uid);
+        const ptText = showBracket ? `(${p.currentPt})` : String(p.currentPt);
+        ptRow.push(drawList({ text: ptText }));
     });
 
     const tableRows: Canvas[][] = [];
-    let colWidths: number[] = new Array(headerStringArray.length).fill(0);
+    let colWidths: number[] = new Array(players.length + 1).fill(0);
     header.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
     ptRow.forEach((c, idx) => colWidths[idx] = Math.max(colWidths[idx], c.width));
 
@@ -753,7 +778,6 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
 
         players.forEach((player, pIdx) => {
             const val = player.speeds[tIdx] ?? "---";
-            // 如果玩家在车队中，使用车队专属颜色，否则使用默认色
             const playerColor = colorMap.get(player.name) || '#505050';
             const speedImg = drawList({ text: val, color: playerColor });
             row.push(speedImg);

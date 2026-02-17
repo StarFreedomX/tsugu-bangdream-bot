@@ -437,10 +437,10 @@ export function apply(ctx: Context, config: Config) {
 
     ctx.command('分速表 [commandArgs:text]', '查询当前前十分速表', cmdConfig)
         .option('length', '-l <length:string> 指定时间范围，默认60(单位min)')
+        .option('allPlayer', '-a')
         .option('time', '-t <time:string> 指定结束统计的时间，格式为H或HH:mm')
         .option('date', '-d <date:string> 指定结束统计日期，格式为"年/月/日"或"月/日"(分隔符用.也可)')
         .action(async ({ session, options }, commandArgs) => {
-
             const isHour = (s: string) => (/^(?:[01]?\d|2[0-4])(?:[:：][0-5]\d)?$/.test(s))
             const isDate = (s: string) => (/^(?:(\d{4})[/.](\d{1,2})[/.](\d{1,2})|(\d{1,2})[/.](\d{1,2}))$/.test(s))
             const isTimeRange = (s: string) => (/^\d+(min|h|m)?$/i.test(s))
@@ -459,6 +459,8 @@ export function apply(ctx: Context, config: Config) {
                         date ??= parseDate(arg);
                     } else if (isTimeRange(arg)) {
                         length ??= parseTimeToMinutes(arg);
+                    }else if (arg === '-a'){
+                        options.allPlayer = true;
                     } else if (!/\d/.test(arg)) { // 不含数字，视为服务器名
                         serverName ??= arg;
                     }
@@ -494,7 +496,7 @@ export function apply(ctx: Context, config: Config) {
                 return '参数length输入无效，请指定正确的时间长度(单位min)';
             }
 
-            const list = await commandTopTenMinuteSpeed(config, mainServer, length, date)
+            const list = await commandTopTenMinuteSpeed(config, mainServer, length, date, options.allPlayer)
             return (paresMessageList(list))
         })
 
