@@ -10,7 +10,7 @@ import { outputFinalBuffer } from '@/image/output';
 import { drawPlayerRankingInList } from '@/components/list/playerRanking';
 import {
     drawCutoffEventTopChart,
-    drawCutOffEventTopSingleChart
+    drawCutOffEventTopSingleChart, drawSinglePointChart
 } from '@/components/chart/cutoffChart';
 import { songChartRouter } from '@/routers/songChart';
 import { drawList, drawListMerge } from '@/components/list';
@@ -79,38 +79,6 @@ export async function drawTopRateDetail(eventId: number, playerId: number, tier:
         const dayEndAt = dayEnd.getTime();
         cutoffEventTop.points = cutoffEventTop.points.filter(point => (point.time > dayStartAt && point.time < dayEndAt));
     }
-
-    function parseLimit(limit?: string): { min: number; max: number } {
-        // 默认值
-        let min = 0;
-        let max = Infinity;
-        if (!limit || typeof limit !== "string") {
-            return { min, max };
-        }
-        let str = limit.trim()
-            .replace(/＞/g, ">")
-            .replace(/＜/g, "<")
-            .replace(/＝/g, "=");
-        // 匹配 ">N"
-        if (/^>\d+$/.test(str)) min = Number(str.slice(1)) + 1;
-        // 匹配 "<N"
-        if (/^<\d+$/.test(str)) max = Number(str.slice(1)) - 1;
-        // 匹配 ">=N"
-        if (/^>=\d+$/.test(str)) min = Number(str.slice(1));
-        // 匹配 "<=N"
-        if (/^<=\d+$/.test(str)) max = Number(str.slice(1));
-        // 匹配 "A-B"
-        if (/^\d+-\d+$/.test(str)) {
-            const [a, b] = str.split("-").map(Number);
-            if (a <= b) {
-                min = a;
-                max = b;
-            }
-        }
-        // 其他不合法输入 → 默认值
-        return { min, max };
-    }
-
 
     var all = [];
     const widthMax = 1000, line: Canvas = drawDottedLine({
@@ -966,6 +934,109 @@ export async function drawTopRunningStatus(eventId: number, playerId: number, ti
     return [buffer];
 }
 
+export async function drawTopPointStat(eventId: number, playerId: number, tier: number, limit: string, mainServer: Server, compress: boolean) {
+
+    var event = new Event(eventId);
+    var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
+    await cutoffEventTop.initFull(0);
+    if (!cutoffEventTop.isExist) {
+        return [`错误: ${ serverNameFullList[mainServer] } ${ eventId } 活动不存在或数据不足`];
+    }
+
+    var all = [];
+    const widthMax = 1000, line: Canvas = drawDottedLine({
+        width: widthMax,
+        height: 30,
+        startX: 5,
+        startY: 15,
+        endX: widthMax - 5,
+        endY: 15,
+        radius: 2,
+        gap: 10,
+        color: "#a8a8a8"
+    })
+    all.push(drawTitle('分数图', `${ serverNameFullList[mainServer] }`));
+    {
+        const list: Array<Image | Canvas> = [];
+        //名片
+        var userInRankings = cutoffEventTop.getLatestRanking();
+        for (let i = 0; i < userInRankings.length; i++) {
+            if (playerId && userInRankings[i].uid != playerId || tier && tier != i + 1) {
+                continue
+            }
+            playerId = userInRankings[i].uid
+            var user = cutoffEventTop.getUserByUid(playerId);
+            var playerRankingImage = await drawPlayerRankingInList(user, 'white', mainServer);
+            if (playerRankingImage != undefined) {
+                list.push(resizeImage({ image: playerRankingImage, widthMax }));
+            }
+        }
+        if (list.length > 0) {
+            all.push(drawDatablock({ list, maxWidth: widthMax }))
+        } else
+            return [`玩家当前不在${ serverNameFullList[mainServer] }: 活动${ eventId }前十名里`]
+    }
+    all.push(drawDatablock({
+        list: [await drawSinglePointChart(cutoffEventTop, playerId, limit)],
+        topLeftText: `分数变动散点图`,
+        maxWidth: widthMax
+    }))
+
+    // 3. 数据分析统计块
+    {
+        const statList = [];
+        // 获取筛选后的差值数据
+        const diffsData = getSinglePlayDiffs(cutoffEventTop.points, playerId, limit);
+        const diffs = diffsData.map(d => d.value);
+
+        if (diffs.length > 0) {
+            // --- 统计学特征计算 ---
+            const count = diffs.length;
+            const avg = diffs.reduce((a, b) => a + b, 0) / count;
+            const sorted = [...diffs].sort((a, b) => a - b);
+            const median = count % 2 !== 0 ? sorted[Math.floor(count / 2)] : (sorted[count / 2 - 1] + sorted[count / 2]) / 2;
+
+            // 标准差 (稳定性)
+            const stdDev = Math.sqrt(diffs.map(x => Math.pow(x - avg, 2)).reduce((a, b) => a + b, 0) / count);
+
+            // 众数计算
+            const counts = new Map();
+            let maxFreq = 0;
+            diffs.forEach(x => {
+                const f = (counts.get(x) || 0) + 1;
+                counts.set(x, f);
+                if (f > maxFreq) maxFreq = f;
+            });
+            const modes = Array.from(counts.entries()).filter(([_, f]) => f === maxFreq).map(([v]) => v);
+
+            // --- 绘制列表内容 ---
+            const addRow = (key: string, value: string) => {
+                statList.push(drawListMerge([drawList({ text: key }), drawList({ text: value })], widthMax));
+                statList.push(line);
+            };
+
+            addRow('样本总数', `${count} 把`);
+            addRow('分数区间', `${sorted[0]} ~ ${sorted[count - 1]}`);
+            addRow('平均出分 (Mean)', `${avg.toFixed(1)}`);
+            addRow('中位数 (Median)', `${median}`);
+            addRow('出分众数 (Mode)', maxFreq > 1 ? `${modes.slice(0, 3).join(', ')} (频次:${maxFreq})` : '无明显众数');
+            addRow('标准差 (StdDev)', `${stdDev.toFixed(1)}`);
+            addRow('变异系数 (CV)', `${(stdDev / avg * 100).toFixed(2)}%`);
+
+            statList.pop(); // 移除最后一条多余的虚线
+        } else {
+            statList.push(drawList({ text: '当前区间内无有效出分数据' }));
+        }
+
+        all.push(drawDatablock({ list: statList, topLeftText: `数据特征分析` }));
+    }
+
+    all.push(await drawEventDatablock(event, [mainServer]));
+    var buffer = await outputFinalBuffer({ imageList: all, useEasyBG: true, compress: compress })
+
+    return [buffer];
+}
+
 //points按时间分数升序排列
 export function getRatingByPlayer(points: Array<{
     time: number,
@@ -1217,4 +1288,67 @@ function identifyRooms(players: any[], similarityThreshold = 0.9) {
         }
     }
     return rooms;
+}
+
+export function parseLimit(limit?: string): { min: number; max: number } {
+    // 默认值
+    let min = 0;
+    let max = Infinity;
+    if (!limit || typeof limit !== "string") {
+        return { min, max };
+    }
+    let str = limit.trim()
+        .replace(/＞/g, ">")
+        .replace(/＜/g, "<")
+        .replace(/＝/g, "=");
+    // 匹配 ">N"
+    if (/^>\d+$/.test(str)) min = Number(str.slice(1)) + 1;
+    // 匹配 "<N"
+    if (/^<\d+$/.test(str)) max = Number(str.slice(1)) - 1;
+    // 匹配 ">=N"
+    if (/^>=\d+$/.test(str)) min = Number(str.slice(1));
+    // 匹配 "<=N"
+    if (/^<=\d+$/.test(str)) max = Number(str.slice(1));
+    // 匹配 "A-B"
+    if (/^\d+-\d+$/.test(str)) {
+        const [a, b] = str.split("-").map(Number);
+        if (a <= b) {
+            min = a;
+            max = b;
+        }
+    }
+    // 其他不合法输入 → 默认值
+    return { min, max };
+}
+/**
+ * 处理玩家分数数据，提取单把增量（diff）
+ */
+export function getSinglePlayDiffs(points: any[], playerUid: number, limit?: string) {
+    const cleanData = getRatingByPlayer(points, playerUid);
+    if (!cleanData || cleanData.length < 2) return [];
+
+    // 解析限制条件
+    const { min, max } = parseLimit(limit);
+
+    // 计算差分
+    const sortedData = [...cleanData].reverse();
+    const results = [];
+
+    for (let i = 1; i < sortedData.length; i++) {
+        const current = sortedData[i];
+        const prev = sortedData[i - 1];
+
+        if (prev.value === -1 || current.value === -1) continue;
+
+        const diff = current.value - prev.value;
+
+        // 过滤逻辑
+        if (diff >= min && diff <= max && diff > 0) {
+            results.push({
+                time: current.time,
+                value: diff
+            });
+        }
+    }
+    return results;
 }

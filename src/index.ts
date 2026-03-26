@@ -45,6 +45,7 @@ import { serverNameFuzzySearchResult, getFuzzySearchResult } from './api/fuzzySe
 import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
 import { isInteger } from "./commands/utils";
+import { commandTopPointStat } from "./commands/topPointStat";
 
 
 export const name = 'tsugu-bangdream-bot';
@@ -362,6 +363,57 @@ export function apply(ctx: Context, config: Config) {
         mainServer = serverFromServerNameFuzzySearch
       }
       const list = await commandTopRateDetail(config, eventId === undefined ? undefined : Number(eventId), options.day, f_limit, options.count, playerId, tier, mainServer)
+      return (paresMessageList(list))
+    })
+
+    ctx.command('分数图 <playerId:string> [limit:string] [eventId] [serverName:string]', '查询分数散点图', cmdConfig)
+    .action(async ({ session }, playerId, limit, eventId, serverName) => {
+      if (playerId == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查岗`
+      }
+
+      var tier
+      if (isNaN(parseInt(playerId))) {
+        if (playerId[0] == 't' && !isNaN(parseInt(playerId.slice(1)))) {
+          tier = parseInt(playerId.slice(1))
+          playerId = undefined
+        }
+        else {
+          return `请确认输入玩家id或者排名格式正确`
+        }
+        if (tier > 10 || tier < 1) {
+          return `请确认输入的排名在1到10之间`
+        }
+      }
+      let f_limit: string;
+      if (limit){
+        let str = limit.trim()
+          .replace(/＞/g, ">")
+          .replace(/＜/g, "<")
+          .replace(/＝/g, "=");
+        if (/^>\d+$/.test(str)||/^<\d+$/.test(str)||/^>=\d+$/.test(str)||/^<=\d+$/.test(str)||/^\d+-\d+$/.test(str)){
+            f_limit ??= limit
+        }else{
+          serverName = eventId;
+          eventId = limit;
+        }
+      }
+      if(isNaN(Number(eventId))) {
+        serverName = eventId;
+        eventId = undefined;
+      }
+      console.log(serverName)
+
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      const list = await commandTopPointStat(config, eventId === undefined ? undefined : Number(eventId), f_limit, playerId, tier, mainServer)
       return (paresMessageList(list))
     })
 

@@ -19,6 +19,7 @@ interface drawTimeLineChartOptions {
     start: Date;
     end: Date;
     setStartToZero?: boolean;
+    setYStartToZero?: boolean;
     data: {
         datasets: any[];
     };
@@ -26,7 +27,7 @@ interface drawTimeLineChartOptions {
 
 // 6. 主函数：生成时间轴图表
 export async function drawTimeLineChart(
-    {start, end, setStartToZero = false, data}: drawTimeLineChartOptions,
+    {start, end, setStartToZero = false, setYStartToZero = true, data}: drawTimeLineChartOptions,
     displayLabel = false
 ) {
     const width = 800;
@@ -40,6 +41,12 @@ export async function drawTimeLineChart(
     const yMax = Math.max(
         ...data.datasets.map((dataset: any) =>
             Math.max(...dataset.data.map((pt: any) => pt.y))
+        )
+    );
+    // 计算 y 轴最小值
+    const yMin = setYStartToZero ? 0 : Math.max(
+        ...data.datasets.map((dataset: any) =>
+            Math.min(...dataset.data.map((pt: any) => pt.y))
         )
     );
 
@@ -79,7 +86,7 @@ export async function drawTimeLineChart(
                 display: !setStartToZero,
             },
             y: {
-                min: 0,
+                min: (setYStartToZero || yMin < 1000) ? 0 : (yMin - 1000) * 0.9,
                 max: (yMax + 1000) * 1.1,
             },
         },

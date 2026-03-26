@@ -22,6 +22,7 @@ import { songRandomRouter } from '@/routers/songRandom'
 import { fuzzySearchRouter } from '@/routers/fuzzySearch'
 import { medleyCalRouter } from '@/routers/medleyCal'
 import { topRateDetailRouter } from './routers/topRateDetail';
+import { topPointStatRouter } from "@/routers/topPointStat";
 import { topRateRankingRouter } from './routers/topRateRanking';
 import { topSleepStatRouter } from "@/routers/topSleepStat";
 import { topRunningStatusRouter } from "@/routers/topRunningStatus";
@@ -58,6 +59,7 @@ app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);
 app.use('/medleyCal', medleyCalRouter);
 app.use('/topRateDetail', topRateDetailRouter);
+app.use('/topPointStat', topPointStatRouter);
 app.use('/topRateRanking', topRateRankingRouter);
 app.use('/topTenMinuteSpeed', topTenMinuteSpeedRouter);
 app.use('/topSleepStat', topSleepStatRouter);
