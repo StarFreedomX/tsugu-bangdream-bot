@@ -7,6 +7,7 @@ import { Bestdoriurl } from '@/config';
 import { loadImageFromPath } from '@/image/utils';
 import { assetsRootPath } from "@/config";
 import * as path from 'path'
+import { readJSONFromBuffer } from "@/types/utils";
 
 export class Degree {
     degreeId: number;

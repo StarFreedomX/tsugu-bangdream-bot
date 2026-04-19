@@ -21,7 +21,7 @@ maxWidth,
 lineHeight = textSize * 4 / 3,
 color = "#505050",
 opacity = 1,
-font = "old" as "old" | "default",
+font = "old" as "FangZhengHeiTi" | "old" | "default",
 parseStyle = false,
 autoWrap = false
 }) {
@@ -287,7 +287,7 @@ interface TextWithImagesOptions {
     content: (string | Canvas | Image)[];
     spacing?: number;
     color?: string;
-    font?: "default" | "old"
+    font?: "FangZhengHeiTi" | "old" | "default"
 }
 
 // 画文字包含图片
