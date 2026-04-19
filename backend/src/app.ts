@@ -101,6 +101,20 @@ app.use((req, res) => {
     res.status(404).send('404 Not Found');
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     logger(`expressMainThread`, `listening on port ${port}`);
+});
+
+process.on('SIGINT', () => {
+    console.log('\n收到 SIGINT (Ctrl+C)，正在释放端口...');
+
+    server.close(() => {
+        console.log('端口已成功关闭');
+        process.exit(0);
+    });
+
+    setTimeout(() => {
+        console.error('强制关闭超时，执行退出');
+        process.exit(1);
+    }, 2000);
 });
