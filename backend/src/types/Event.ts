@@ -376,6 +376,79 @@ export class Event {
 
 }
 
+//按时间范围获取符合条件的活动
+export function getEventListByTimeRange(rangeStart?: number, rangeEnd?: number, displayedServerList: Server[] = globalDefaultServer) {
+    const eventIdList: Array<number> = Object.keys(mainAPI['events']).map(Number);
+    const tempEventList: Array<Event> = [];
+
+    if (rangeStart == null && rangeEnd == null) {
+        return tempEventList;
+    }
+
+    const eventCache = new Map<number, Event>();
+    const presentEventByServer = new Map<Server, Event | null>();
+    for (let i = 0; i < displayedServerList.length; i++) {
+        const server = displayedServerList[i];
+        if (!presentEventByServer.has(server)) {
+            presentEventByServer.set(server, getPresentEvent(server));
+        }
+    }
+
+    for (let i = 0; i < eventIdList.length; i++) {
+        const eventId = eventIdList[i];
+        let tempEvent = eventCache.get(eventId);
+        if (!tempEvent) {
+            tempEvent = new Event(eventId);
+            eventCache.set(eventId, tempEvent);
+        }
+
+        for (let j = 0; j < displayedServerList.length; j++) {
+            const server = displayedServerList[j];
+            const timeWindow = getEventTimeWindowByServer(tempEvent, server, presentEventByServer.get(server) ?? null);
+
+            if (!timeWindow) continue;
+
+            const { startAt, endAt } = timeWindow;
+
+            // 仅保留与目标时间范围有交集的活动
+            if ((rangeEnd == null || startAt < rangeEnd) && (rangeStart == null || endAt > rangeStart)) {
+                tempEventList.push(tempEvent);
+                break;
+            }
+        }
+    }
+    return tempEventList;
+}
+
+function getEventTimeWindowByServer(event: Event, server: Server, presentEvent: Event | null): { startAt: number, endAt: number } | null {
+    const startAt = event.startAt[server];
+    const endAt = event.endAt[server];
+    if (startAt != null && endAt != null) {
+        return { startAt, endAt };
+    }
+
+    // 仅对国服未来活动使用预测时间窗口
+    if (server != Server.cn || !presentEvent || event.eventId <= presentEvent.eventId) {
+        return null;
+    }
+
+    const jpStartAt = event.startAt[Server.jp];
+    const jpEndAt = event.endAt[Server.jp];
+    if (jpStartAt == null || jpEndAt == null || jpEndAt <= jpStartAt) {
+        return null;
+    }
+
+    const forecastStartAt = GetProbablyTimeDifference(event.eventId, presentEvent);
+    if (!Number.isFinite(forecastStartAt)) {
+        return null;
+    }
+
+    return {
+        startAt: forecastStartAt,
+        endAt: forecastStartAt + (jpEndAt - jpStartAt),
+    };
+}
+
 //获取当前进行中的活动,如果期间没有活动，则返回上一个刚结束的活动
 export function getPresentEvent(server: Server, time?: number) {
     if (!time) {

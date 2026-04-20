@@ -1,14 +1,15 @@
-import { isInteger } from '@/routers/utils';
+import { isInteger, parseSearchDate } from '@/routers/utils';
 import { fuzzySearch, FuzzySearchResult, isFuzzySearchResult } from '@/fuzzySearch';
 import { drawEventDetail } from '@/view/eventDetail';
 import { drawEventList } from '@/view/eventList';
-import { getServerByServerId, Server } from '@/types/Server';
+import { Server } from '@/types/Server';
 import { listToBase64 } from '@/routers/utils';
 import { isServerList } from '@/types/Server';
 import express from 'express';
 import { body } from 'express-validator';
 import { middleware } from '@/routers/middleware';
 import { Request, Response } from 'express';
+import { getEventListByTimeRange } from '@/types/Event';
 
 const router = express.Router();
 
@@ -52,6 +53,15 @@ export async function commandEvent(displayedServerList: Server[], input: string 
     let fuzzySearchResult: FuzzySearchResult
     // 根据 input 的类型执行不同的逻辑
     if (typeof input === 'string') {
+        const dateRange = parseSearchDate(input);
+        if (dateRange) {
+            const tempEventList = getEventListByTimeRange(dateRange.rangeStart, dateRange.rangeEnd, displayedServerList);
+            if (tempEventList.length == 0) {
+                return ['没有搜索到符合条件的活动'];
+            }
+            return await drawEventList({ eventId: tempEventList.map((event) => event.eventId) }, displayedServerList, compress);
+        }
+
         if (isInteger(input)) {
             return await drawEventDetail(parseInt(input), displayedServerList, useEasyBG, compress)
         }
