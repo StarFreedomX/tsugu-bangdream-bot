@@ -48,6 +48,7 @@ export async function drawCutoffAll(eventId: number, mainServer: Server, compres
     //每个档线详细数据
     for (var i in cutoffList) {
         const cutoff = cutoffList[i]
+        if (!cutoff.latestCutoff) continue
         let cutoffContent: string[] = []
         if (cutoff.status == 'in_progress') {
             let predictText: string
@@ -59,10 +60,12 @@ export async function drawCutoffAll(eventId: number, mainServer: Server, compres
             }
             cutoffContent.push(`当前预测线: ${predictText}\n`)
             cutoffContent.push(`最新分数线: ${cutoff.latestCutoff.ep.toString()}\n`)
-            cutoffContent.push(`更新时间:${changeTimefomant(cutoff.latestCutoff.time)}`)
+            cutoffContent.push(`更新时间:${changeTimefomant(cutoff.latestCutoff.time)}\n`)
+            cutoffContent.push(`日增：${cutoff.dailyIncrement.join('/')}`)
         }
         else if (cutoff.status == 'ended') {
             cutoffContent.push(`最终分数线:${cutoff.latestCutoff.ep.toString()}\n`)
+            cutoffContent.push(`日增：${cutoff.dailyIncrement.join('/')}`)
         }
 
 
