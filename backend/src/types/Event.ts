@@ -377,7 +377,76 @@ export class Event {
 
 }
 //按时间范围获取符合条件的活动
-export function getEventListByTimeRange(rangeStart?: number[], rangeEnd?: number[], displayedServerList: Server[] = globalDefaultServer) {
+export function getEventListByDisplayServerListTimeRange(rangeStart?: number[], rangeEnd?: number[], displayedServerList: Server[] = globalDefaultServer) {
+    const eventIdList: Array<number> = Object.keys(mainAPI['events']).map(Number);
+    const tempEventList: Array<Event> = [];
+
+    if (rangeStart == null && rangeEnd == null) {
+        return tempEventList;
+    }
+
+    // 寻找本次查询的基准服务器 (baseServer)
+    let baseServer: Server = Server.jp; // 默认兜底是日服
+    let hasFoundBase = false;
+
+    // 按照用户传入的 displayedServerList 顺序查找有月榜数据的服务器
+    for (let i = 0; i < displayedServerList.length; i++) {
+        const server = displayedServerList[i];
+        if ((rangeStart && rangeStart[server] != null) || (rangeEnd && rangeEnd[server] != null)) {
+            baseServer = server;
+            hasFoundBase = true;
+            break; // 找到了立刻中断，这就是最高优先级的服
+        }
+    }
+
+    // 如果把展示列表翻遍了都没找到有数据的服，且展示列表里本来就不含日服，则自动回退到日服
+    if (!hasFoundBase) {
+        baseServer = Server.jp;
+    }
+
+    // 提取出这个基准服务器对应的月榜时间范围限制
+    const limitStart = rangeStart ? rangeStart[baseServer] : null;
+    const limitEnd = rangeEnd ? rangeEnd[baseServer] : null;
+
+    // 如果连最终兜底的日服在月榜里也完全没数据，直接返回空
+    if (limitStart == null && limitEnd == null) {
+        return tempEventList;
+    }
+
+    const eventCache = new Map<number, Event>();
+    const presentEventByServer = new Map<Server, Event | null>();
+
+    // 初始化基准服务器当前正在进行的活动（用于 getEventTimeWindowByServer 内部逻辑）
+    presentEventByServer.set(baseServer, getPresentEvent(baseServer));
+
+    // 只用 baseServer 去过滤所有活动
+    for (let i = 0; i < eventIdList.length; i++) {
+        const eventId = eventIdList[i];
+        let tempEvent = eventCache.get(eventId);
+        if (!tempEvent) {
+            tempEvent = new Event(eventId);
+            eventCache.set(eventId, tempEvent);
+        }
+
+        // 仅获取该活动在 baseServer 上的时间窗口
+        const timeWindow = getEventTimeWindowByServer(tempEvent, baseServer, presentEventByServer.get(baseServer) ?? null);
+
+        // 如果这个活动在 baseServer 上根本不存在，直接跳过
+        if (!timeWindow) continue;
+
+        const { startAt, endAt } = timeWindow;
+
+        // 仅保留与 baseServer 月榜时间范围有交集的活动
+        if ((limitEnd == null || startAt < limitEnd) && (limitStart == null || endAt > limitStart)) {
+            tempEventList.push(tempEvent);
+        }
+    }
+
+    return tempEventList;
+}
+
+//按时间范围获取符合条件的活动
+export function getEventListByTimeRange(rangeStart?: number, rangeEnd?: number, displayedServerList: Server[] = globalDefaultServer) {
     const eventIdList: Array<number> = Object.keys(mainAPI['events']).map(Number);
     const tempEventList: Array<Event> = [];
 
@@ -387,13 +456,8 @@ export function getEventListByTimeRange(rangeStart?: number[], rangeEnd?: number
 
     const eventCache = new Map<number, Event>();
     const presentEventByServer = new Map<Server, Event | null>();
-
-    // 动态构建服务器优先队列：[...displayedServerList, Server.jp] 并去重
-    const targetServers = Array.from(new Set([...displayedServerList, Server.jp]));
-
-    // 预加载所有可能用到的服务器当前活动
-    for (let i = 0; i < targetServers.length; i++) {
-        const server = targetServers[i];
+    for (let i = 0; i < displayedServerList.length; i++) {
+        const server = displayedServerList[i];
         if (!presentEventByServer.has(server)) {
             presentEventByServer.set(server, getPresentEvent(server));
         }
@@ -407,33 +471,19 @@ export function getEventListByTimeRange(rangeStart?: number[], rangeEnd?: number
             eventCache.set(eventId, tempEvent);
         }
 
-        // 寻找第一个有有效时间窗口的服务器（按优先级依次往后找）
-        let validTimeWindow = null;
-        let selectedServer: Server = Server.jp; // 记录最终是谁的数据生效了
-
-        for (let j = 0; j < targetServers.length; j++) {
-            const server = targetServers[j];
+        for (let j = 0; j < displayedServerList.length; j++) {
+            const server = displayedServerList[j];
             const timeWindow = getEventTimeWindowByServer(tempEvent, server, presentEventByServer.get(server) ?? null);
 
-            if (timeWindow) {
-                validTimeWindow = timeWindow;
-                selectedServer = server; // 锁定了优先级最高的服务器
-                break; // 找到了就立刻停下，不再看后面的服务器
+            if (!timeWindow) continue;
+
+            const { startAt, endAt } = timeWindow;
+
+            // 仅保留与目标时间范围有交集的活动
+            if ((rangeEnd == null || startAt < rangeEnd) && (rangeStart == null || endAt > rangeStart)) {
+                tempEventList.push(tempEvent);
+                break;
             }
-        }
-
-        // 如果连日服都没有这个活动的数据，直接跳过
-        if (!validTimeWindow) continue;
-
-        const { startAt, endAt } = validTimeWindow;
-
-        // 利用 selectedServer 索引去取传入数组中对应服务器的时间戳
-        const limitEnd = rangeEnd ? rangeEnd[selectedServer] : null;
-        const limitStart = rangeStart ? rangeStart[selectedServer] : null;
-
-        // 仅保留与选定服务器的目标时间范围有交集的活动
-        if ((limitEnd == null || startAt < limitEnd) && (limitStart == null || endAt > limitStart)) {
-            tempEventList.push(tempEvent);
         }
     }
     return tempEventList;

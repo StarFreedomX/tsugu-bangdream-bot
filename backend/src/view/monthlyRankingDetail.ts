@@ -12,7 +12,7 @@ import { drawSongInList } from '@/components/list/song';
 import { drawEventDatablock } from '@/components/dataBlock/event';
 import { drawDegreeListInList } from '@/components/list/degreeList';
 import { Degree } from '@/types/Degree';
-import { getEventListByTimeRange } from '@/types/Event';
+import { getEventListByDisplayServerListTimeRange, getEventListByTimeRange } from '@/types/Event';
 import { changeTimefomant } from "@/components/list/time";
 
 async function buildMonthlyRankingDetailBlocks(monthlyRanking: MonthlyRanking, displayedServerList: Server[]) {
@@ -82,8 +82,7 @@ async function buildMonthlyRankingDetailBlocks(monthlyRanking: MonthlyRanking, d
     all.push(drawTitle('查询', '月榜'))
 
     all.push(listImage)
-    const targetServer = displayedServerList.filter(Boolean).at(0) ?? Server.jp;
-    const relatedEvents = getEventListByTimeRange(monthlyRanking.startAt, monthlyRanking.endAt, displayedServerList);
+    const relatedEvents = getEventListByDisplayServerListTimeRange(monthlyRanking.startAt, monthlyRanking.endAt, displayedServerList);
 
     if (relatedEvents && relatedEvents.length > 0) {
         const eventImageList: Canvas[] = []

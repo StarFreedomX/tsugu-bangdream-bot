@@ -9,7 +9,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import { middleware } from '@/routers/middleware';
 import { Request, Response } from 'express';
-import { getEventListByTimeRange } from '@/types/Event';
+import { getEventListByDisplayServerListTimeRange, getEventListByTimeRange } from '@/types/Event';
 
 const router = express.Router();
 
