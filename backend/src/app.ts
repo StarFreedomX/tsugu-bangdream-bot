@@ -5,6 +5,7 @@ import { roomListRouter } from '@/routers/roomList';
 import { searchCardRouter } from '@/routers/searchCard';
 import { searchCharacterRouter } from '@/routers/searchCharacter';
 import { searchEventRouter } from '@/routers/searchEvent';
+import { searchMonthlyRankingRouter } from '@/routers/searchMonthlyRanking';
 import { searchGachaRouter } from '@/routers/searchGacha';
 import { searchPlayerRouter } from '@/routers/searchPlayer';
 import { searchSongRouter } from '@/routers/searchSong';
@@ -12,6 +13,8 @@ import { songMetaRouter } from '@/routers/songMeta';
 import { cutoffDetailRouter } from '@/routers/cutoffDetail';
 import { cutoffListOfRecentEventRouter } from '@/routers/cutoffListOfEvent';
 import { cutoffAllRouter } from '@/routers/cutoffAll';
+import { monthlyRankingCutoffDetailRouter } from '@/routers/monthlyRankingCutoffDetail';
+import { monthlyRankingCutoffListOfRecentRouter } from '@/routers/monthlyRankingCutoffListOfRecent';
 import { songChartRouter } from '@/routers/songChart';
 import { userRouter } from '@/routers/user'
 import { stationRouter } from '@/routers/station'
@@ -31,6 +34,7 @@ import { searchCompositionRouter } from './routers/searchComposition';
 
 import { logger } from '@/logger'
 import * as dotenv from 'dotenv';
+import { monthlyRankingCutoffAllRouter } from "@/routers/monthlyRankingCutoffAll";
 
 
 dotenv.config();
@@ -46,6 +50,7 @@ app.use('/roomList', roomListRouter);
 app.use('/searchCard', searchCardRouter);
 app.use('/searchCharacter', searchCharacterRouter);
 app.use('/searchEvent', searchEventRouter);
+app.use('/searchMonthlyRanking', searchMonthlyRankingRouter);
 app.use('/searchGacha', searchGachaRouter);
 app.use('/searchPlayer', searchPlayerRouter);
 app.use('/searchSong', searchSongRouter);
@@ -54,6 +59,9 @@ app.use('/songChart', songChartRouter);
 app.use('/cutoffDetail', cutoffDetailRouter);
 app.use('/cutoffListOfRecentEvent', cutoffListOfRecentEventRouter);
 app.use('/cutoffAll', cutoffAllRouter);
+app.use('/monthlyRankingCutoffDetail', monthlyRankingCutoffDetailRouter);
+app.use('/monthlyRankingCutoffListOfRecent', monthlyRankingCutoffListOfRecentRouter);
+app.use('/monthlyRankingCutoffAll', monthlyRankingCutoffAllRouter);
 app.use('/eventStage', eventStageRouter);
 app.use('/songRandom', songRandomRouter);
 app.use('/fuzzySearch', fuzzySearchRouter);

@@ -46,6 +46,10 @@ import {} from 'koishi-plugin-adapter-onebot'
 import { Player } from './types/Player'
 import { isInteger } from "./commands/utils";
 import { commandTopPointStat } from "./commands/topPointStat";
+import { commandMonthlyRankingCutoffDetail } from "./commands/monthlyRankingCutoffDetail";
+import { commandMonthlyRankingCutoffAll } from "./commands/monthlyRankingCutoffAll";
+import { commandMonthlyRankingCutoffListOfRecent } from "./commands/monthlyRankingCutoffListOfRecent";
+import { commandMonthlyRanking } from "./commands/searchMonthlyRanking";
 
 
 export const name = 'tsugu-bangdream-bot';
@@ -683,6 +687,19 @@ export function apply(ctx: Context, config: Config) {
       const list = await commandEvent(config, displayedServerList, text)
       return paresMessageList(list)
     })
+  ctx.command("查月榜 <word:text>", "查月榜", cmdConfig)
+    .usage('根据关键词或月榜ID查询月榜信息')
+    .example('查月榜 17 :返回17号月榜的信息')
+    .action(async ({ session }, text) => {
+      if (text == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help 查月榜`
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      const displayedServerList = tsuguUserData.displayedServerList
+        console.log(displayedServerList)
+      const list = await commandMonthlyRanking(config, displayedServerList, text)
+      return paresMessageList(list)
+    })
   ctx.command("查曲 <word:text>", "查曲", cmdConfig)
     .usage('根据关键词或曲目ID查询曲目信息')
     .example('查曲 1 :返回1号曲的信息').example('查曲 ag lv27 :返回所有难度为27的ag曲列表')
@@ -877,6 +894,78 @@ export function apply(ctx: Context, config: Config) {
       }
       // @ts-ignore
       const list = await commandCutoffListOfRecentEvent(config, mainServer, tier, eventId)
+      return paresMessageList(list)
+    })
+  ctx.command("mycx <tier:integer> [monthlyRankingId] [serverName]", "查询指定档位的月榜预测线", cmdConfig)
+    .usage(`查询指定档位的月榜预测线, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有月榜ID的话, 活动为当前月榜\n可用档线:\n:\n${tierListOfServerToString()}`)
+    .example('mycx 1000 :返回默认服务器当前月榜1000档位的档线与预测线').example('mycx 1000 177 jp:返回日服177号活动1000档位的档线与预测线')
+    .action(async ({ session }, tier, monthlyRankingId, serverName) => {
+      if (tier == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help mycx`
+      }
+      // @ts-ignore
+      if(isNaN(monthlyRankingId)) {
+        serverName = monthlyRankingId;
+        monthlyRankingId = undefined;
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      // @ts-ignore
+      const list = await commandMonthlyRankingCutoffDetail(config, mainServer, tier, monthlyRankingId)
+      return paresMessageList(list)
+    })
+  ctx.command("mycxall [monthlyRankingId] [serverName]", "查询所有档位的预测线", cmdConfig)
+    .usage(`查询所有档位的预测线, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有月榜ID的话, 活动为当前月榜\n可用档线:\n${tierListOfServerToString()}`)
+    .example('mycxall :返回默认服务器当前月榜所有档位的档线与预测线').example('mycxall 177 jp:返回日服177号月榜所有档位的档线与预测线')
+    .action(async ({ session }, monthlyRankingId, serverName) => {
+      // @ts-ignore
+      if(isNaN(monthlyRankingId)) {
+        serverName = monthlyRankingId;
+          monthlyRankingId = undefined;
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      // @ts-ignore
+      const list = await commandMonthlyRankingCutoffAll(config, mainServer, monthlyRankingId)
+      return paresMessageList(list)
+    })
+  ctx.command("mlsycx <tier:integer> [monthlyRankingId] [serverName]", "查询指定档位的月榜预测线", cmdConfig)
+    .usage(`查询指定档位的预测线, 与最近的4期活动类型相同的活动的档线数据, 如果没有服务器名的话, 服务器为用户的默认服务器。如果没有月榜ID的话, 活动为当前月榜\n可用档线:\n${tierListOfServerToString()}`)
+    .example('mlsycx 1000 :返回默认服务器当前月榜1000档位的档线与预测线, 与最近的4期活动类型相同的活动的档线数据').example('mlsycx 1000 177 jp:返回日服177号月榜1000档位档线与最近的4期活动类型相同的活动的档线数据')
+    .action(async ({ session }, tier, monthlyRankingId, serverName) => {
+      if (tier == undefined) {
+        return `错误: 指令不完整\n使用以下指令以查看帮助:\n  help mlsycx`
+      }
+      // @ts-ignore
+      if(isNaN(monthlyRankingId)) {
+        serverName = monthlyRankingId;
+        monthlyRankingId = undefined;
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      // @ts-ignore
+      const list = await commandMonthlyRankingCutoffListOfRecent(config, mainServer, tier, monthlyRankingId)
       return paresMessageList(list)
     })
 

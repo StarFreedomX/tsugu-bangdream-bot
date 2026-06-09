@@ -79,7 +79,7 @@ export function GetProbablyTimeDifference(eventId: number, currentEvent: Event):
 
 export function changeTimefomant(timeStamp: number | null) {//时间戳到年月日 精确到分钟
     if (timeStamp == null) {
-        return '?'
+        return null
     }
     var date = new Date(Math.floor(timeStamp / 1000) * 1000)
     var nMinutes: string
