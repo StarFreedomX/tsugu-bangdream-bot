@@ -37,7 +37,6 @@ router.post(
 
 export async function commandTopSpeedRanking(mainServer: Server, compress: boolean, time = 60, date: Date, compareTier?: number, comparePlayerUid?: number): Promise<Array<Buffer | string>> {
   const targetTime = new Date(date);
-  targetTime.setHours(time);
   const eventId = getPresentEvent(mainServer, +targetTime).eventId
   return await drawTopRateRanking(eventId, mainServer, compress, time, date, compareTier, comparePlayerUid);
 }

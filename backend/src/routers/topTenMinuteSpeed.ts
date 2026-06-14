@@ -36,7 +36,6 @@ router.post(
 
 export async function commandTopTenMinuteSpeed(mainServer: Server, compress: boolean, date: Date, time?: number, allPlayer?: boolean): Promise<Array<Buffer | string>> {
   const targetTime = new Date(date);
-  targetTime.setHours(time)
   const eventId = getPresentEvent(mainServer, +targetTime).eventId
   return await drawTopTenMinuteSpeed(eventId, mainServer, compress, date, time, allPlayer);
 }
