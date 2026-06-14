@@ -30,7 +30,12 @@ import { topRateRankingRouter } from './routers/topRateRanking';
 import { topSleepStatRouter } from "@/routers/topSleepStat";
 import { topRunningStatusRouter } from "@/routers/topRunningStatus";
 import { topTenMinuteSpeedRouter } from "@/routers/topTenMinuteSpeed";
-import { searchCompositionRouter } from './routers/searchComposition';
+import { monthlyRankingTopRateDetailRouter } from './routers/monthlyRankingTopRateDetail';
+import { monthlyRankingTopRateRankingRouter } from './routers/monthlyRankingTopRateRanking';
+import { monthlyRankingTopSleepStatRouter } from "@/routers/monthlyRankingTopSleepStat";
+import { monthlyRankingTopRunningStatusRouter } from "@/routers/monthlyRankingTopRunningStatus";
+import { monthlyRankingTopTenMinuteSpeedRouter } from "@/routers/monthlyRankingTopTenMinuteSpeed";
+import { searchCompositionRouter } from '@/routers/searchComposition';
 
 import { logger } from '@/logger'
 import * as dotenv from 'dotenv';
@@ -72,6 +77,11 @@ app.use('/topRateRanking', topRateRankingRouter);
 app.use('/topTenMinuteSpeed', topTenMinuteSpeedRouter);
 app.use('/topSleepStat', topSleepStatRouter);
 app.use('/topRunningStatus', topRunningStatusRouter);
+app.use('/monthlyRankingTopRateDetail', monthlyRankingTopRateDetailRouter);
+app.use('/monthlyRankingTopRateRanking', monthlyRankingTopRateRankingRouter);
+app.use('/monthlyRankingTopTenMinuteSpeed', monthlyRankingTopTenMinuteSpeedRouter);
+app.use('/monthlyRankingTopSleepStat', monthlyRankingTopSleepStatRouter);
+app.use('/monthlyRankingTopRunningStatus', monthlyRankingTopRunningStatusRouter);
 app.use('/searchComposition', searchCompositionRouter);
 
 // console.log(process.env)

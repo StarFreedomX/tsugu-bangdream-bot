@@ -19,6 +19,7 @@ import { resizeImage } from '@/components/utils';
 import { stackImage } from '@/components/utils';
 import { drawRoundedRectWithText } from "@/image/drawRect";
 import { presetColorList } from "@/types/Color";
+import { MonthlyRankingCutoffTop } from "@/types/MonthlyRankingCutoff";
 
 export async function drawCutoffEventTop(eventId: number, mainServer: Server, compress: boolean): Promise<Array<Buffer | string>> {
     var cutoffEventTop = new CutoffEventTop(eventId, mainServer);
@@ -747,7 +748,7 @@ export async function drawTopTenMinuteSpeed(eventId: number, mainServer: Server,
         players.forEach((player, pIdx) => {
             const val = player.speeds[tIdx] ?? "---";
             const playerColor = colorMap.get(player.name) || '#505050';
-            const speedImg = drawList({ text: val, color: playerColor });
+            const speedImg = drawList({ text: val, color:  val == 0 || val == "---" ? "#CCCCCC" : playerColor });
             row.push(speedImg);
             colWidths[pIdx + 1] = Math.max(colWidths[pIdx + 1], speedImg.width);
         });
@@ -1074,7 +1075,7 @@ export function getRatingByPlayer(points: Array<{
     })
 }
 
-export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
+export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop | MonthlyRankingCutoffTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
     const limitPoints = date ? cutoffEventTop.points.filter(item => item.time <= date.getTime()) : cutoffEventTop.points;
     const now = limitPoints.at(-1).time;
     const top10List: { uid: number, point: number }[] = limitPoints.slice(-10).map(({ uid, value }) => ({
