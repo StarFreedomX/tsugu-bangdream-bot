@@ -7,38 +7,100 @@ FontLibrary.use("FangZhengHeiTi", [`${assetsRootPath}/Fonts/FangZhengHeiTi_GBK.t
 interface warpTextOptions {
     text: string,
     textSize?: number,
-    maxWidth: number,
+    maxWidth?: number,
     lineHeight?: number,
-    font?: "FangZhengHeiTi" | "old" | "default",
+    opacity?: number,
+    autoWrap?: boolean,
     color?: string,
     parseStyle?: boolean
+    font?: "FangZhengHeiTi" | "old" | "default",
+    forceSingleLine?:boolean
 }
 
 export function drawText({
-text,
-textSize = 40,
-maxWidth,
-lineHeight = textSize * 4 / 3,
-color = "#505050",
-opacity = 1,
-font = "old" as "FangZhengHeiTi" | "old" | "default",
-parseStyle = false,
-autoWrap = false
-}) {
-    if (autoWrap && maxWidth) {
-        return drawTextWithImages({
-            content: [text], // 包装成数组
-            textSize,
-            maxWidth,
-            lineHeight,
-            color,
-            font
-        });
+    text,
+    textSize = 40,
+    maxWidth,
+    lineHeight = textSize * 4 / 3,
+    color = "#505050",
+    opacity = 1,
+    font = "old",
+    parseStyle = false,
+    autoWrap = false,
+    forceSingleLine=false
+}: warpTextOptions): Canvas {
+  if (forceSingleLine) {
+    let canvas = new Canvas(1, 1);
+    let ctx = canvas.getContext('2d');
+    setFontStyle(ctx, textSize, font);
+    const width = ctx.measureText(text).width;
+
+    canvas = new Canvas(width, lineHeight);
+    ctx = canvas.getContext('2d');
+    setFontStyle(ctx, textSize, font);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = opacity;
+    ctx.fillText(text, 0, lineHeight / 2 + textSize / 3);
+    return canvas;
+  }
+  if (autoWrap && maxWidth) {
+    // 如果开启了样式解析，走富文本图文混合换行
+    if (parseStyle) {
+      return drawTextWithImages({
+        content: [text],
+        textSize,
+        maxWidth,
+        lineHeight,
+        color,
+        font
+      });
     }
-    if (!parseStyle) {
-      // 原样绘制
+
+    // 如果没有开启样式解析，走纯文本自动换行逻辑 (来自代码 2)
+    const wrappedTextData = wrapText({ text, maxWidth, lineHeight, textSize });
+    let canvas: Canvas;
+
+    if (wrappedTextData.numberOfLines === 0) {
+      canvas = new Canvas(1, lineHeight);
+    } else if (wrappedTextData.numberOfLines === 1) {
+      let ctxTmp = new Canvas(1, 1).getContext('2d');
+      setFontStyle(ctxTmp, textSize, font);
+      const width = ctxTmp.measureText(wrappedTextData.wrappedText[0]).width;
+      canvas = new Canvas(width, lineHeight);
+    } else {
+      canvas = new Canvas(maxWidth, lineHeight * wrappedTextData.numberOfLines);
+    }
+
+    const ctx = canvas.getContext('2d');
+    let currentY = lineHeight / 2 + textSize / 3;
+    ctx.textBaseline = 'alphabetic';
+    setFontStyle(ctx, textSize, font);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = opacity;
+
+    for (const lineText of wrappedTextData.wrappedText) {
+      ctx.fillText(lineText, 0, currentY);
+      currentY += lineHeight;
+    }
+    return canvas;
+  }
+  if (!parseStyle) {
+    // 优先使用专门的纯文本绘制函数，若无则降级为单行普通绘制
+    if (typeof drawPlainText === 'function') {
       return drawPlainText({ text, textSize, maxWidth, lineHeight, color, opacity, font });
+    } else {
+      let ctxTmp = new Canvas(1, 1).getContext('2d');
+      setFontStyle(ctxTmp, textSize, font);
+      const width = ctxTmp.measureText(text).width;
+      const canvas = new Canvas(width, lineHeight);
+      const ctx = canvas.getContext('2d');
+      setFontStyle(ctx, textSize, font);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = opacity;
+      ctx.fillText(text, 0, lineHeight / 2 + textSize / 3);
+      return canvas;
     }
+  }
     text = ` ${text}`
 
     // 样式
