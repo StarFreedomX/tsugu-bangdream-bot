@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "./dist",
-    "target": "es2020",
+    "target": "ES2022",
     "module": "commonjs",
     "declaration": true,
     "skipLibCheck": true,
