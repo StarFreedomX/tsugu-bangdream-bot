@@ -414,7 +414,7 @@ export async function drawMonthlyRankingTopRateRanking(monthlyRankingId: number,
         gap: 10,
         color: "#a8a8a8"
     })
-    all.push(drawTitle('t10时速排名', `${serverNameFullList[mainServer]}`));
+    all.push(drawTitle('t10月榜时速排名', `${serverNameFullList[mainServer]}`));
     list.push(drawListMerge(header.filter(Boolean), widthMax, false, "top", drawWidth))
     top10RankingTable.forEach((row) => {
         list.push(line)

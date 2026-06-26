@@ -1075,8 +1075,8 @@ export function getRatingByPlayer(points: Array<{
     })
 }
 
-export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop | MonthlyRankingCutoffTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
-    const limitPoints = date ? cutoffEventTop.points.filter(item => item.time <= date.getTime()) : cutoffEventTop.points;
+export function getTopRatingDuringTime(cutoffTop: CutoffEventTop | MonthlyRankingCutoffTop, windowTimeLimit: number = 60, date: Date, compareTier: number, comparePlayerUid: number) {
+    const limitPoints = date ? cutoffTop.points.filter(item => item.time <= date.getTime()) : cutoffTop.points;
     const now = limitPoints.at(-1).time;
     const top10List: { uid: number, point: number }[] = limitPoints.slice(-10).map(({ uid, value }) => ({
         uid,
@@ -1122,7 +1122,7 @@ export function getTopRatingDuringTime(cutoffEventTop: CutoffEventTop | MonthlyR
         top10_ranking.push({
             ranking: index + 1,
             uid: uid,
-            name: cutoffEventTop.getUserNameById(uid),
+            name: cutoffTop.getUserNameById(uid),
             point: nowPoints,
             distanceToAbove: index == 0 ? 0 : top10List[index - 1].point - nowPoints,
             distanceToPlayer: comparePlayerPoints ? nowPoints - comparePlayerPoints : 0,
