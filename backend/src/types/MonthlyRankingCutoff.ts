@@ -292,9 +292,9 @@ export class MonthlyRankingCutoff {
             } else {
                 if (this.getDaysOfEvent(time[i]) > j) {
                     const lostDays = this.getDaysOfEvent(time[i]) - j + 1;
-                    const avgIncrementValue = Math.round((i == 0 ? (score[i] - 0) : (score[i] - score[i - 1])) / lostDays);
+                    const avgIncrementValue = Math.round((i == 0 ? (score[i]) : (score[i] - score[i - 1])) / lostDays);
                     for (let ld = 0; ld < lostDays; ld++) {
-                        scoreFinal.push(Math.round(i == 0 ? 0 + avgIncrementValue * (ld + 1) : score[i - 1] + avgIncrementValue * (ld + 1)));
+                        scoreFinal.push(Math.round(i == 0 ? avgIncrementValue * (ld + 1) : score[i - 1] + avgIncrementValue * (ld + 1)));
                         dailyIncrementInvaildDays.push(scoreFinal.length - 1);
                         j++;
                     }
@@ -327,7 +327,7 @@ export class MonthlyRankingCutoff {
         // 1. 获取最新一个数据点及其服务器本地时间
         const lastCutoffIndex = this.cutoffs.length - 1;
         const lastCutoffTime = this.cutoffs[lastCutoffIndex].time;
-        const lastCutoffEp = this.cutoffs[lastCutoffIndex].ep;
+        // const lastCutoffEp = this.cutoffs[lastCutoffIndex].ep;
 
         const dateNow = getDateByServerTimezone(lastCutoffTime, this.server);
         const targetHour = dateNow.getUTCHours();
@@ -471,7 +471,7 @@ export class MonthlyRankingCutoffTop {
         return this.monthlyRanking.monthlyRankingName[server] ?? this.monthlyRanking.monthlyRankingName.find(Boolean) ?? `月榜${ this.monthlyRankingId }`;
     }
 
-    async initFull(interval = 3600000) {
+    async initFull(_interval = 3600000) {
         if (!this.isExist || this.isInitfull) {
             return;
         }
@@ -484,7 +484,7 @@ export class MonthlyRankingCutoffTop {
             time: point.timestamp,
             uid: point.uid,
             value: point.value,
-        })).sort((a, b) => a.time - b.time || a.uid - b.uid);
+        }));
         this.users = (topData.users ?? []).map((user) => ({
             ...user,
             ranking: 0,
