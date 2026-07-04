@@ -1,7 +1,7 @@
 import { Server } from "@/types/Server";
 import { Event } from '@/types/Event';
 import { callAPIAndCacheResponse } from "@/api/getApi";
-import { Bestdoriurl } from "@/config";
+import { Bestdoriurl, STAR_VIEWER_Url, USE_STAR_VIEWER_SOURCE_PREFER, reportSTAR_VIEWERDataSourceProblem, clearSTAR_VIEWERDataSourceProblem } from "@/config";
 
 
 export class CutoffEventTop{
@@ -12,6 +12,7 @@ export class CutoffEventTop{
     status: 'not_start' | 'in_progress' | 'ended';
     isInitfull: boolean = false;
     isExist = false;
+    useSTAR_VIEWER = USE_STAR_VIEWER_SOURCE_PREFER;
     points:{
         time:number,
         uid:number,
@@ -50,6 +51,31 @@ export class CutoffEventTop{
             this.status = 'in_progress';
         }
     }
+    getFinalApiUrl (reverse:boolean){   // reverse:是否反向获取
+        if (this.server == Server.jp){  // 日服使用STAR_VIEWER回退
+            var url =  !reverse?(this.useSTAR_VIEWER?STAR_VIEWER_Url:Bestdoriurl):(this.useSTAR_VIEWER?Bestdoriurl:STAR_VIEWER_Url)
+            if (reverse) this.useSTAR_VIEWER = !this.useSTAR_VIEWER
+            return url
+        }
+        else {  // 其他服不使用回退数据源
+            this.useSTAR_VIEWER = false
+            return Bestdoriurl
+        }
+    }
+    async getFinalEventTopData (interval:number = 3600000){
+        try{    // 当数据源获取出现网络问题时切换到另一数据源获取数据
+            return await callAPIAndCacheResponse(`${this.getFinalApiUrl(false)}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`,0,3)
+        }
+        catch (e){
+            if (e.response.status != 404 && this.server == Server.jp) reportSTAR_VIEWERDataSourceProblem()
+            try{
+                return await callAPIAndCacheResponse(`${this.getFinalApiUrl(true)}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`,0,3)
+            }
+            catch{
+                return null
+            }
+        }
+    }
     async initFull(interval = 3600000){
         if (!this.isExist){
             return
@@ -57,8 +83,8 @@ export class CutoffEventTop{
         if(this.isInitfull){
             return;
         }
-        const topData = await callAPIAndCacheResponse(`${Bestdoriurl}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`);
-        if(topData == undefined){
+        const topData = await this.getFinalEventTopData(interval);
+        if(topData == undefined || topData == null){
             this.isExist = false;
             return;
         }

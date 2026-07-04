@@ -39,6 +39,9 @@ export const BandoriStationurl: string = 'https://api.bandoristation.com/'; //Ba
 export const HHWX_Url: string = 'https://hhwx.org'; //HHWX网站的url
 export var USE_HHWX_SOURCE_PREFER = false;   // 是否优先使用HHWX的Tracker数据
 
+export const STAR_VIEWER_Url: string = 'https://grp-speed-backend.starfreedomx.top'; //STAR_VIEWER网站的url（请配置实际地址）
+export var USE_STAR_VIEWER_SOURCE_PREFER = false;   // 是否优先使用STAR_VIEWER的Tracker数据
+
 const enableAutoTrackerDataSourceSwitch = true  // 是否开启数据源优先自动切换
 const trackerAutoSwitchThreshold:number = 5     // 设定数据源自动切换门限，当存在5次数据源更新不及时的情况，自动切换数据源，加快访问速度
 var trackerAutoSwitchFlags:number = 0
@@ -53,6 +56,20 @@ export function reportDataSourceProblem(){
 }
 export function clearDataSourceProblem(){
     trackerAutoSwitchFlags = 0
+}
+
+var starViewerAutoSwitchFlags:number = 0
+export function reportSTAR_VIEWERDataSourceProblem(){
+    if(enableAutoTrackerDataSourceSwitch){
+        if(++starViewerAutoSwitchFlags > trackerAutoSwitchThreshold-1){
+            USE_STAR_VIEWER_SOURCE_PREFER = !USE_STAR_VIEWER_SOURCE_PREFER
+            logger('config.ts/reportSTAR_VIEWERDataSourceProblem',`Tracker数据源多次出现问题，将数据源优先切换至${USE_STAR_VIEWER_SOURCE_PREFER?"STAR_VIEWER":"Bestdori"}`)
+            starViewerAutoSwitchFlags = 0
+        }
+    }
+}
+export function clearSTAR_VIEWERDataSourceProblem(){
+    starViewerAutoSwitchFlags = 0
 }
 
 export const globalDefaultServer: Array<Server> = [Server.cn, Server.jp]//默认服务器列表

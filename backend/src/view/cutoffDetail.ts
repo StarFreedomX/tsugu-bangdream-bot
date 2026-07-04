@@ -76,7 +76,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
 
         //更新时间
         const finalTimeImage = drawList({
-            key: `更新时间 / ${cutoff.useHHWX?"HHWX":"Bestdori"}`,
+            key: `更新时间 / ${mainServer==Server.jp?(cutoff.useSTAR_VIEWER?"STAR_VIEWER":"Bestdori"):(cutoff.useHHWX?"HHWX":"Bestdori")}`,
             text: `${changeTimePeriodFormat((new Date().getTime()) - cutoff.latestCutoff.time)}前`
         })
         tempImageList.push(finalTimeImage)
