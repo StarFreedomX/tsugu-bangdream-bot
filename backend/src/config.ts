@@ -40,7 +40,42 @@ export const HHWX_Url: string = 'https://hhwx.org'; //HHWX网站的url
 export var USE_HHWX_SOURCE_PREFER = false;   // 是否优先使用HHWX的Tracker数据
 
 export const STAR_VIEWER_Url: string = 'https://grp-speed-backend.starfreedomx.top'; //STAR_VIEWER网站的url（请配置实际地址）
-export var USE_STAR_VIEWER_SOURCE_PREFER = false;   // 是否优先使用STAR_VIEWER的Tracker数据
+export var USE_STAR_VIEWER_SOURCE_PREFER = true;   // 是否优先使用STAR_VIEWER的Tracker数据
+
+// ===== 数据源回退链配置 =====
+// 数据源key → URL映射
+export const SOURCE_URL_MAP: Record<string, string> = {
+    "star_viewer": STAR_VIEWER_Url,
+    "bestdori": Bestdoriurl,
+    "hhwx": HHWX_Url
+};
+
+// 活动档线数据源回退链（按服务器，越靠前优先级越高）
+export const EVENTRANKING_TURNS: Record<string, string[]> = {
+    "cn": ["star_viewer", "bestdori", "hhwx"],
+    "jp": ["star_viewer", "bestdori"],
+    "default": ["bestdori"]
+};
+
+// 歌榜数据源回退链（仅STAR_VIEWER有歌榜数据）
+export const MUSICRANKING_TURNS: Record<string, string[]> = {
+    "cn": ["star_viewer"],
+    "jp": ["star_viewer"],
+    "default": ["bestdori"]
+};
+
+// 月榜数据源回退链
+export const MONTHRANKING_TURNS: Record<string, string[]> = {
+    "cn": ["star_viewer"],
+    "jp": ["star_viewer"],
+    "default": ["bestdori"]
+};
+
+// 统一解析：将server和turns配置转换为 {url, name} 数组
+export function resolveSourceUrls(server: string, turnsConfig: Record<string, string[]>): {url: string, name: string}[] {
+    const keys = turnsConfig[server] || turnsConfig["default"] || ["bestdori"];
+    return keys.map(key => ({ url: SOURCE_URL_MAP[key], name: key }));
+}
 
 const enableAutoTrackerDataSourceSwitch = true  // 是否开启数据源优先自动切换
 const trackerAutoSwitchThreshold:number = 5     // 设定数据源自动切换门限，当存在5次数据源更新不及时的情况，自动切换数据源，加快访问速度

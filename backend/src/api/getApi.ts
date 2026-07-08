@@ -18,6 +18,15 @@ const fixMonthlyApiDomain = (url: string, targetDomain: string): string => {
     return url;
 };
 
+const fixMusicApiDomain = (url: string, targetDomain: string): string => {
+    if (/[?&]mid=([1-9]\d*)/.test(url)) {
+        if (url.includes('/api/eventtop/data') || url.includes('/api/tracker/data')) {
+            return url.replace(/^.*(?=\/api\/(eventtop|tracker)\/data)/, targetDomain);
+        }
+    }
+    return url;
+};
+
 async function callAPIAndCacheResponse(url: string, cacheTime: number = 0, retryCount: number = 3): Promise<object> {
   if (url.includes('hhwx.org/api/tracker/data')) {
     url = url.replace('hhwx.org/api/tracker/data', 'hhwx.org/api/bandori/tracker/data');  // HHWX数据源修复
@@ -26,6 +35,10 @@ async function callAPIAndCacheResponse(url: string, cacheTime: number = 0, retry
   const MONTHLY_DOMAIN = process.env.MONTHLY_DOMAIN;
   if (url.includes('/api/monthlyRanking')) {
       url = fixMonthlyApiDomain(url, MONTHLY_DOMAIN)
+  }
+  const MUSIC_RANKING_DOMAIN = process.env.MUSIC_RANKING_DOMAIN;
+  if (MUSIC_RANKING_DOMAIN && /[?&]mid=([1-9]\d*)/.test(url) && (url.includes('/api/eventtop/data') || url.includes('/api/tracker/data'))) {
+      url = fixMusicApiDomain(url, MUSIC_RANKING_DOMAIN)
   }
   const cacheDir = getCacheDirectory(url);
   const fileName = getFileNameFromUrl(url);

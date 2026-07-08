@@ -21,6 +21,7 @@ interface drawTimeLineChartOptions {
     end: Date;
     setStartToZero?: boolean;
     setYStartToZero?: boolean;
+    useSegmentDash?: boolean;
     data: {
         datasets: any[];
     };
@@ -28,7 +29,7 @@ interface drawTimeLineChartOptions {
 
 // 6. 主函数：生成时间轴图表
 export async function drawTimeLineChart(
-    {start, end, setStartToZero = false, setYStartToZero = true, data}: drawTimeLineChartOptions,
+    {start, end, setStartToZero = false, setYStartToZero = true, useSegmentDash = true, data}: drawTimeLineChartOptions,
     displayLabel = false
 ) {
     const width = 800;
@@ -51,18 +52,20 @@ export async function drawTimeLineChart(
         )
     );
 
-    //10. 虚线
-    const borderDash = (ctx) => {
-        const p0 = ctx.p0.parsed.x as number;
-        const p1 = ctx.p1.parsed.x as number;
-        const diffHours = (p1 - p0) / (1000 * 60 * 60);
-        return diffHours > 2 ? [6, 4] : []; // 超过2h用虚线，否则实线
+    //10. 虚线（仅活动/月榜等连续数据需要，歌榜稀疏数据跳过）
+    if (useSegmentDash) {
+        const borderDash = (ctx) => {
+            const p0 = ctx.p0.parsed.x as number;
+            const p1 = ctx.p1.parsed.x as number;
+            const diffHours = (p1 - p0) / (1000 * 60 * 60);
+            return diffHours > 2 ? [6, 4] : []; // 超过2h用虚线，否则实线
+        }
+        data.datasets.map((dataset: any) =>
+            dataset.segment ? dataset.segment.borderDash = borderDash : dataset.segment = {
+                borderDash,
+            },
+        )
     }
-    data.datasets.map((dataset: any) =>
-        dataset.segment ? dataset.segment.borderDash = borderDash : dataset.segment = {
-            borderDash,
-        },
-    )
 
     // 9. 配置 Chart.js 选项
     const options = {

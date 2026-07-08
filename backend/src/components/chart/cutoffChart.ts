@@ -126,10 +126,10 @@ export async function drawCutoffChart(cutoffList: Cutoff[], setStartToZero = fal
             }
         }
         all.push(await drawTimeLineChart({ data, start: new Date(0), end: new Date(longestTime), setStartToZero }))
-        return (stackImage(all))
-    }
-    else {
-        all.push(await drawTimeLineChart({ data, start: new Date(cutoffList[0].startAt), end: new Date(cutoffList[0].endAt), setStartToZero }))
+            return (stackImage(all))
+        }
+        else {
+            all.push(await drawTimeLineChart({ data, start: new Date(cutoffList[0].startAt), end: new Date(cutoffList[0].endAt), setStartToZero }))
         return (stackImage(all))
     }
 

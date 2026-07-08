@@ -55,6 +55,7 @@ import { commandMonthlyRankingTopRateRanking } from "./commands/monthlyRankingTo
 import { commandMonthlyRankingTopTenMinuteSpeed } from "./commands/monthlyRankingTopTenMinuteSpeed";
 import { commandMonthlyRankingTopRunningStatus } from "./commands/monthlyRankingTopRunningStatus";
 import { commandMonthlyRankingTopSleepStat } from "./commands/monthlyRankingTopSleepStat";
+import { commandCutOffMusic } from "./commands/cutOffMusic";
 
 
 export const name = 'tsugu-bangdream-bot';
@@ -1241,6 +1242,31 @@ ctx.command('m前十车速 [commandArgs:text]', '查询当前月榜前十车速�
       }
       // @ts-ignore
       const list = await commandMonthlyRankingCutoffListOfRecent(config, mainServer, tier, monthlyRankingId)
+      return paresMessageList(list)
+    })
+
+  ctx.command("ycxmusic <tier:integer> <music> [eventId] [serverName]", "查询指定档位的歌榜预测线", cmdConfig)
+    .usage(`查询指定档位的歌榜预测线, tier=10时返回前十线。需要指定歌曲ID(musicId)，如果没有活动ID的话, 活动为当前活动\n可用档线:\n${tierListOfServerToString()}`)
+    .example('ycxmusic 100 184 :返回默认服务器当前活动歌曲184的100档歌榜档线').example('ycxmusic 10 184 321 jp:返回日服321号活动歌曲184的歌榜前十线')
+    .action(async ({ session }, tier, music, eventId, serverName) => {
+      if (tier == undefined || music == undefined) {
+        return `错误: 指令不完整，需要指定档位和歌曲ID\n使用以下指令以查看帮助:\n  help ycxmusic`
+      }
+      // @ts-ignore
+      if (isNaN(eventId)) {
+        serverName = eventId;
+        eventId = undefined;
+      }
+      const tsuguUserData = await observeUserTsugu(session)
+      let mainServer: Server = tsuguUserData.mainServer
+      if (serverName) {
+        const serverFromServerNameFuzzySearch = await serverNameFuzzySearchResult(config, serverName)
+        if (serverFromServerNameFuzzySearch == -1) {
+          return '错误: 服务器名未能匹配任何服务器'
+        }
+        mainServer = serverFromServerNameFuzzySearch
+      }
+      const list = await commandCutOffMusic(config, mainServer, Number(tier), /^\d+$/.test(music) ? Number(music) : music, eventId === undefined ? undefined : Number(eventId))
       return paresMessageList(list)
     })
 

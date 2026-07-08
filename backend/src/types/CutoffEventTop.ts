@@ -1,7 +1,8 @@
 import { Server } from "@/types/Server";
 import { Event } from '@/types/Event';
 import { callAPIAndCacheResponse } from "@/api/getApi";
-import { Bestdoriurl, STAR_VIEWER_Url, USE_STAR_VIEWER_SOURCE_PREFER, reportSTAR_VIEWERDataSourceProblem, clearSTAR_VIEWERDataSourceProblem } from "@/config";
+import { Bestdoriurl, MUSICRANKING_TURNS, resolveSourceUrls } from "@/config";
+import { logger } from '@/logger';
 
 
 export class CutoffEventTop{
@@ -12,7 +13,6 @@ export class CutoffEventTop{
     status: 'not_start' | 'in_progress' | 'ended';
     isInitfull: boolean = false;
     isExist = false;
-    useSTAR_VIEWER = USE_STAR_VIEWER_SOURCE_PREFER;
     points:{
         time:number,
         uid:number,
@@ -51,30 +51,29 @@ export class CutoffEventTop{
             this.status = 'in_progress';
         }
     }
-    getFinalApiUrl (reverse:boolean){   // reverse:是否反向获取
-        if (this.server == Server.jp){  // 日服使用STAR_VIEWER回退
-            var url =  !reverse?(this.useSTAR_VIEWER?STAR_VIEWER_Url:Bestdoriurl):(this.useSTAR_VIEWER?Bestdoriurl:STAR_VIEWER_Url)
-            if (reverse) this.useSTAR_VIEWER = !this.useSTAR_VIEWER
-            return url
-        }
-        else {  // 其他服不使用回退数据源
-            this.useSTAR_VIEWER = false
-            return Bestdoriurl
-        }
+    private getEventTopSources(): { url: string, name: string }[] {
+        return resolveSourceUrls(Server[this.server], MUSICRANKING_TURNS);
+    }
+
+    getFinalApiUrl (){
+        const sources = this.getEventTopSources();
+        return sources[0]?.url || Bestdoriurl;
     }
     async getFinalEventTopData (interval:number = 3600000){
-        try{    // 当数据源获取出现网络问题时切换到另一数据源获取数据
-            return await callAPIAndCacheResponse(`${this.getFinalApiUrl(false)}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`,0,3)
-        }
-        catch (e){
-            if (e.response.status != 404 && this.server == Server.jp) reportSTAR_VIEWERDataSourceProblem()
-            try{
-                return await callAPIAndCacheResponse(`${this.getFinalApiUrl(true)}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`,0,3)
+        const sources = this.getEventTopSources();
+        for (let i = 0; i < sources.length; i++) {
+            try {
+                return await callAPIAndCacheResponse(
+                    `${sources[i].url}/api/eventtop/data?server=${<number>this.server}&event=${this.eventId}&mid=0&interval=${interval}`,
+                    0, 3
+                );
+            } catch (e) {
+                if (e.response?.status != 404) {
+                    logger('CutoffEventTop.ts/getFinalEventTopData', `${sources[i].name}获取失败，尝试下一个`);
+                }
             }
-            catch{
-                return null
-            }
         }
+        return null;
     }
     async initFull(interval = 3600000){
         if (!this.isExist){

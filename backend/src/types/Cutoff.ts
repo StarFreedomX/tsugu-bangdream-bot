@@ -1,6 +1,6 @@
 import { callAPIAndCacheResponse } from '@/api/getApi';
 import mainAPI from '@/types/_Main';
-import { Bestdoriurl, HHWX_Url, USE_HHWX_SOURCE_PREFER, reportDataSourceProblem, clearDataSourceProblem, STAR_VIEWER_Url, USE_STAR_VIEWER_SOURCE_PREFER, reportSTAR_VIEWERDataSourceProblem, clearSTAR_VIEWERDataSourceProblem, tierListOfServer } from '@/config';
+import { Bestdoriurl, STAR_VIEWER_Url, USE_HHWX_SOURCE_PREFER, USE_STAR_VIEWER_SOURCE_PREFER, EVENTRANKING_TURNS, resolveSourceUrls, tierListOfServer } from '@/config';
 import { Server } from '@/types/Server';
 import { Event, getPresentEvent } from '@/types/Event';
 import { predict } from '@/api/cutoff.cjs'
@@ -62,14 +62,12 @@ export class Cutoff {
         }
     }
     getFinalApiUrl (reverse:boolean){   // reverse:是否反向获取。假如useHHWX/useSTAR_VIEWER为False，当反向开启后就使用对应数据源
-        if (this.server == Server.cn){  // 国服使用HHWX回退
-            var url =  !reverse?(this.useHHWX?HHWX_Url:Bestdoriurl):(this.useHHWX?Bestdoriurl:HHWX_Url)
-            if (reverse) this.useHHWX = !this.useHHWX
+        if (this.server == Server.cn){  // 国服使用STAR_VIEWER优先，Bestdori作为临时回退
+            var url = !reverse ? STAR_VIEWER_Url : Bestdoriurl
             return url
         }
-        else if (this.server == Server.jp){  // 日服使用STAR_VIEWER回退
-            var url =  !reverse?(this.useSTAR_VIEWER?STAR_VIEWER_Url:Bestdoriurl):(this.useSTAR_VIEWER?Bestdoriurl:STAR_VIEWER_Url)
-            if (reverse) this.useSTAR_VIEWER = !this.useSTAR_VIEWER
+        else if (this.server == Server.jp){  // 日服使用STAR_VIEWER优先，Bestdori作为临时回退
+            var url = !reverse ? STAR_VIEWER_Url : Bestdoriurl
             return url
         }
         else {  // 其他服不使用回退数据源
@@ -79,35 +77,30 @@ export class Cutoff {
         }
     }
     async getFinalCutoffsData (forceReadCache:boolean = false ){
-        if (!forceReadCache){
-            try{    // 当数据源获取出现网络问题时切换到另一数据源获取数据
-                return await callAPIAndCacheResponse(`${this.getFinalApiUrl(false)}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`,0,3)
-            }
-            catch (e){
-                if (e.response.status != 404 && this.server == Server.cn) reportDataSourceProblem()
-                if (e.response.status != 404 && this.server == Server.jp) reportSTAR_VIEWERDataSourceProblem()
-                try{
-                    return await callAPIAndCacheResponse(`${this.getFinalApiUrl(true)}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`,0,3)
-                }
-                catch{
-                    return null
-                }
-            }
-        }else{
-            try{
-                return await callAPIAndCacheResponse(`${this.getFinalApiUrl(false)}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`,1/0,3)
-            }
-            catch(e){
-                if (e.response.status != 404 && this.server == Server.cn) reportDataSourceProblem()
-                if (e.response.status != 404 && this.server == Server.jp) reportSTAR_VIEWERDataSourceProblem()
-                try{
-                    return await callAPIAndCacheResponse(`${this.getFinalApiUrl(true)}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`,1/0,3)
-                }
-                catch{
-                    return null;
+        return await this.tryTrackerSources(forceReadCache);
+    }
+
+    private getTrackerSources(): { url: string, name: string }[] {
+        return resolveSourceUrls(Server[this.server], EVENTRANKING_TURNS);
+    }
+
+    private async tryTrackerSources(forceReadCache: boolean, startIndex: number = 0): Promise<object | null> {
+        const cacheTime = forceReadCache ? 1/0 : 0;
+        const sources = this.getTrackerSources();
+        
+        for (let i = startIndex; i < sources.length; i++) {
+            try {
+                return await callAPIAndCacheResponse(
+                    `${sources[i].url}/api/tracker/data?server=${<number>this.server}&event=${this.eventId}&tier=${this.tier}`,
+                    cacheTime, 3
+                );
+            } catch (e) {
+                if (e.response?.status != 404) {
+                    logger('Cutoff.ts/tryTrackerSources', `${sources[i].name}获取失败，尝试下一个`);
                 }
             }
         }
+        return null;
     }
     async initFull() {
         if (this.isInitfull) {
@@ -120,35 +113,33 @@ export class Cutoff {
         //如果cutoff的活动已经结束，则使用缓存
         const time = new Date().getTime()
         if (time < this.endAt + 1000 * 60 * 60 * 24 * 2) {
-            var oldDataSourceFlags = this.useHHWX
-            var oldSTAR_VIEWERDataSourceFlags = this.useSTAR_VIEWER
             cutoffData = await this.getFinalCutoffsData()
             if (!cutoffData){
                 this.isExist = false;
                 return
             }
             // var dateNow = Date.now()
-            if (this.server == Server.cn && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && time - cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time >= 2700000){   // 对数据进行实时性检查，如果不通过则使用另一个数据源数据.确保服务器时间对齐东八区
-                this.useHHWX = !this.useHHWX
-                logger('Cutoff.ts/initFull',`数据实时性校验不通过，切换数据源至${this.useHHWX?"HHWX":"Bestdori"} `)
-                reportDataSourceProblem()
-                var cutoffData2 = await this.getFinalCutoffsData()
-                if (cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time < cutoffData2["cutoffs"][cutoffData2["cutoffs"].length-1].time){ // 对比两个数据源的数据哪个更加实时
-                    cutoffData = cutoffData2
+            if (this.server == Server.cn && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && time - cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time >= 2700000){   // CN: STAR_VIEWER数据实时性校验不通过，尝试回退到Bestdori/HHWX
+                logger('Cutoff.ts/initFull', `CN数据源(STAR_VIEWER)数据实时性校验不通过(>45分钟)，尝试回退`)
+                var cutoffData2 = await this.tryTrackerSources(false, 1);
+                if (cutoffData2?.["cutoffs"]?.length && cutoffData2["cutoffs"][cutoffData2["cutoffs"].length-1].time > cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time){
+                    cutoffData = cutoffData2;
+                    logger('Cutoff.ts/initFull', `CN回退至Bestdori数据源，数据更新`)
+                } else {
+                    var cutoffData3 = await this.tryTrackerSources(false, 2);
+                    if (cutoffData3?.["cutoffs"]?.length && cutoffData3["cutoffs"][cutoffData3["cutoffs"].length-1].time > cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time){
+                        cutoffData = cutoffData3;
+                        logger('Cutoff.ts/initFull', `CN回退至HHWX数据源，数据更新`)
+                    }
                 }
-            }else if(this.server == Server.cn && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && oldDataSourceFlags == this.useHHWX){ // 正在进行的活动，数据源数据无问题，清空计数器.
-                clearDataSourceProblem()
             }
-            if (this.server == Server.jp && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && time - cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time >= 2700000){   // 日服数据实时性检查
-                this.useSTAR_VIEWER = !this.useSTAR_VIEWER
-                logger('Cutoff.ts/initFull',`数据实时性校验不通过，切换数据源至${this.useSTAR_VIEWER?"STAR_VIEWER":"Bestdori"} `)
-                reportSTAR_VIEWERDataSourceProblem()
-                var cutoffData2 = await this.getFinalCutoffsData()
-                if (cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time < cutoffData2["cutoffs"][cutoffData2["cutoffs"].length-1].time){ // 对比两个数据源的数据哪个更加实时
-                    cutoffData = cutoffData2
+            if (this.server == Server.jp && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && time - cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time >= 2700000){   // JP: STAR_VIEWER数据实时性校验不通过，尝试回退到Bestdori
+                logger('Cutoff.ts/initFull', `JP数据源(STAR_VIEWER)数据实时性校验不通过(>45分钟)，尝试回退`)
+                var cutoffData2 = await this.tryTrackerSources(false, 1);
+                if (cutoffData2?.["cutoffs"]?.length && cutoffData2["cutoffs"][cutoffData2["cutoffs"].length-1].time > cutoffData["cutoffs"][cutoffData["cutoffs"].length-1].time){
+                    cutoffData = cutoffData2;
+                    logger('Cutoff.ts/initFull', `JP回退至Bestdori数据源，数据更新`)
                 }
-            }else if(this.server == Server.jp && cutoffData["cutoffs"] && cutoffData["cutoffs"].length!=0 && oldSTAR_VIEWERDataSourceFlags == this.useSTAR_VIEWER){ // 正在进行的活动，数据源数据无问题，清空计数器.
-                clearSTAR_VIEWERDataSourceProblem()
             }
         }
         else {

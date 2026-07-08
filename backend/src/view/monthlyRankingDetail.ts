@@ -12,7 +12,7 @@ import { drawSongInList } from '@/components/list/song';
 import { drawEventDatablock } from '@/components/dataBlock/event';
 import { drawDegreeListInList } from '@/components/list/degreeList';
 import { Degree } from '@/types/Degree';
-import { getEventListByDisplayServerListTimeRange, getEventListByTimeRange } from '@/types/Event';
+import { getEventListByTimeRange } from '@/types/Event';
 import { changeTimefomant } from "@/components/list/time";
 
 async function buildMonthlyRankingDetailBlocks(monthlyRanking: MonthlyRanking, displayedServerList: Server[]) {
@@ -82,30 +82,24 @@ async function buildMonthlyRankingDetailBlocks(monthlyRanking: MonthlyRanking, d
     all.push(drawTitle('查询', '月榜'))
 
     all.push(listImage)
-    const relatedEvents = getEventListByDisplayServerListTimeRange(monthlyRanking.startAt, monthlyRanking.endAt, displayedServerList);
 
-    if (relatedEvents && relatedEvents.length > 0) {
-        const eventImageList: Canvas[] = []
-        const eventIdList: number[] = [] // 用于活动去重
+    // 相关活动：按显示服务器逐服查询
+    const eventImageList: Canvas[] = []
 
-        // 依照服务器进行外层循环
-        for (let i = 0; i < displayedServerList.length; i++) {
+    for (let i = 0; i < displayedServerList.length; i++) {
             const server = displayedServerList[i]
+            if (monthlyRanking.startAt[server] == null || monthlyRanking.endAt[server] == null) {
+                continue
+            }
+            const serverEvents = getEventListByTimeRange(
+                monthlyRanking.startAt[server],
+                monthlyRanking.endAt[server],
+                [server]
+            )
+            if (!serverEvents || serverEvents.length == 0) continue
 
-            // 遍历所有时间窗口内的活动
-            for (let j = 0; j < relatedEvents.length; j++) {
-                const ev = relatedEvents[j];
-
-                // 如果该活动在当前服务器没有开始时间，说明该服不适用，跳过
-                if (ev.startAt[server] == null) {
-                    continue
-                }
-
-                // 如果这个活动在之前的服务器或者之前的循环里已经处理过了，跳过
-                if (eventIdList.indexOf(ev.eventId) != -1) {
-                    continue
-                }
-
+            for (let j = 0; j < serverEvents.length; j++) {
+                const ev = serverEvents[j]
                 try {
                     if (j == 0) {
                         eventImageList.push(await drawEventDatablock(ev, displayedServerList, `${serverNameFullList[server]}相关活动`))
@@ -115,14 +109,11 @@ async function buildMonthlyRankingDetailBlocks(monthlyRanking: MonthlyRanking, d
                 } catch (e) {
                     continue
                 }
-
-                eventIdList.push(ev.eventId)
             }
         }
         for (let i = 0; i < eventImageList.length; i++) {
             all.push(eventImageList[i])
         }
-    }
 
     return all;
 }

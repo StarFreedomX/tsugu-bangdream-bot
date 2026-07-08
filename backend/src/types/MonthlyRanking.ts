@@ -5,6 +5,7 @@ import { Server, getServerByPriority } from '@/types/Server'
 import mainAPI from '@/types/_Main';
 import { globalDefaultServer, Bestdoriurl } from '@/config';
 import { stringToNumberArray } from '@/types/utils'
+import { arraysEqual } from '@/api/utils'
 
 // Types provided by user for API shapes
 export type MonthlyRankingInfo = {
@@ -114,14 +115,21 @@ export class MonthlyRanking {
         this.isInitFull = true;
     }
 
-    // fetch detailed data from Bestdori
+    // fetch detailed data
     async getData(update: boolean = true): Promise<MonthlyRankingDetail | MonthlyRankingInfo | undefined> {
         const ttl = update ? 0 : Infinity;
         // Prefer per-id detail if available
         try {
             const url = `${Bestdoriurl}/api/monthlyRanking/info.${this.monthlyRankingId}.json`;
-            const data = await callAPIAndCacheResponse(url, ttl);
-            return data as MonthlyRankingDetail;
+            var data = await callAPIAndCacheResponse(url, ttl) as MonthlyRankingDetail;
+            // 缓存一致性校验：比对mainAPI内存数据，不一致则缓存过期，强制刷新（参照Event.getData）
+            if (!update) {
+                const mainData = (mainAPI as any)['monthlyRanking']?.[this.monthlyRankingId.toString()];
+                if (mainData && !arraysEqual(data['startAt'], mainData['startAt'])) {
+                    data = await callAPIAndCacheResponse(url, 0) as MonthlyRankingDetail;
+                }
+            }
+            return data;
         }
         catch (e) {
             // fallback to list endpoint
