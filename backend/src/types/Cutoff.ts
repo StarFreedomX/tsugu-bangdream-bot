@@ -87,7 +87,7 @@ export class Cutoff {
     private async tryTrackerSources(forceReadCache: boolean, startIndex: number = 0): Promise<object | null> {
         const cacheTime = forceReadCache ? 1/0 : 0;
         const sources = this.getTrackerSources();
-        
+
         for (let i = startIndex; i < sources.length; i++) {
             try {
                 return await callAPIAndCacheResponse(
@@ -302,7 +302,7 @@ export class Cutoff {
                 j++ // 增加一天
             }
         }
-        
+
         for (var i = 0;i<score.length;i++){
             if (score.length == 0) break
             if (this.getDaysOfEvent(time[i]) == j){ // 如果当天相对于活动而言天数是i，说明数据完整
@@ -339,7 +339,7 @@ export class Cutoff {
         }
         for (var i = 0;i<scoreFinal.length;i++){   // 计算增量
             if (i == 0){
-                dailyIncrement.push(`${Math.round(scoreFinal[i]/10000)}${dailyIncrementInvaildDays.includes(i) ? '!' : ''}`) 
+                dailyIncrement.push(`${Math.round(scoreFinal[i]/10000)}${dailyIncrementInvaildDays.includes(i) ? '!' : ''}`)
             }
             else{
                 dailyIncrement.push(`${Math.round((scoreFinal[i] - scoreFinal[i-1])/10000)}${dailyIncrementInvaildDays.includes(i) ? '!' : ''}` )
@@ -364,42 +364,76 @@ export class Cutoff {
         if (UTCMin == 45 && UTCHour == 3) lengthLimit++
         let curEventDays = this.getDaysOfEvent(lastCutoffTime)
         let lastCutoffEp = this.cutoffs[this.cutoffs.length-(usePrevPoint?2:1)].ep
-        //console.log(curEventDays)
+
+        // 目标时刻：最后一个数据点的UTC时分
+        const dateNow = getDateByServerTimezone(lastCutoffTime, this.server)
+        const targetUtcHour = dateNow.getUTCHours()
+        const targetUtcMinutes = dateNow.getUTCMinutes()
+        const targetMinutesOfDay = targetUtcHour * 60 + targetUtcMinutes
+
+        // 收集 3:45 数据点（前天和昨天）
         let score:number[] = []
         let time:number[] = []
-        let scoreCur:number[] = []
-        let timeCur:number[] = []
-        const dateNow = getDateByServerTimezone(lastCutoffTime, this.server)
-        const lastestUtcHour = dateNow.getUTCHours()
-        const lastestUtcMinutes = dateNow.getUTCMinutes()
+        // 收集昨天的所有数据点，用于找最近邻
+        let yesterdayPoints: { ep: number, time: number }[] = []
 
         for (const c of this.cutoffs) {
-            let allowPushFlag = false
             const timestamp = normalizeTimestamp(c.time)
             const d = this.getDaysOfEvent(timestamp)
             if (d < (curEventDays-2)){
                 continue
-            }
-            if (d > (curEventDays-2) ){
-                allowPushFlag = true
             }
             const date = getDateByServerTimezone(timestamp, this.server)
             if ((this.server == Server.cn || this.server == Server.tw || this.server == Server.jp) && date.getUTCHours() === 3 && date.getUTCMinutes() === 45) {
                 score.push(c.ep)
                 time.push(timestamp)
             }
-            if (allowPushFlag && (this.server == Server.cn || this.server == Server.tw || this.server == Server.jp) && date.getUTCHours() === lastestUtcHour && date.getUTCMinutes() === lastestUtcMinutes) {
-                scoreCur.push(c.ep)
-                timeCur.push(timestamp)
+            // 收集昨天的所有数据点（不管什么时分，全收）
+            if (d == (curEventDays - 1)) {
+                yesterdayPoints.push({ ep: c.ep, time: timestamp })
             }
         }
-        if (score.length !=lengthLimit || scoreCur.length!=2) return '数据缺失' 
-        // 此时score里边应该会有两个数据，一个是昨日3:45，一个是今日3:45的数据
-        let TodaysIncrement = (lastCutoffEp - score[1])
-        let YesterdaysIncrement = ( scoreCur[0] - score[0] )
+
+        if (score.length < lengthLimit) return '数据缺失'
+        if (yesterdayPoints.length == 0) return '数据缺失'
+
+        // 在昨天的数据点中找最接近目标时刻的那个
+        let nearestPoint = yesterdayPoints[0]
+        let nearestDiff = Infinity
+        for (const p of yesterdayPoints) {
+            const d = getDateByServerTimezone(p.time, this.server)
+            const minutesOfDay = d.getUTCHours() * 60 + d.getUTCMinutes()
+            const diff = Math.abs(minutesOfDay - targetMinutesOfDay)
+            if (diff < nearestDiff) {
+                nearestDiff = diff
+                nearestPoint = p
+            }
+        }
+
+        // score[0] = 前天3:45, score[1] = 昨天3:45
+        const dayBeforeYesterdayTime = time[0]
+        const dayBeforeYesterdayEp = score[0]
+        const yesterdayBaseTime = time[1]
+        const yesterdayBaseEp = score[1]
+        const yesterdayNearestTime = nearestPoint.time
+        const yesterdayNearestEp = nearestPoint.ep
+
+        // 今天的时间跨度：从昨天3:45到现在
+        const todayTimeSpan = lastCutoffTime - yesterdayBaseTime
+        // 昨天实际数据的时间跨度：从前天3:45到最近邻数据点
+        const yesterdayTimeSpan = yesterdayNearestTime - dayBeforeYesterdayTime
+
+        if (todayTimeSpan <= 0 || yesterdayTimeSpan <= 0) return '数据缺失'
+
+        // 今天增量 = 最新ep - 昨天3:45的ep
+        let TodaysIncrement = lastCutoffEp - yesterdayBaseEp
+        // 昨天实际增量（原始时间跨度下的增量）
+        let YesterdaysIncrementRaw = yesterdayNearestEp - dayBeforeYesterdayEp
+        // 线性对齐：将昨天的增量按时间比例缩放到今天的等效时长
+        let YesterdaysIncrement = Math.round(YesterdaysIncrementRaw * (todayTimeSpan / yesterdayTimeSpan))
+
         let rate:number = YesterdaysIncrement!=0?TodaysIncrement / YesterdaysIncrement:1
         let result =  `昨天同时刻日增${Math.round((YesterdaysIncrement)/10000)} 现在是昨天的${Math.round(rate * 100)}%${rate*100>=100?'↑':'↓'}`
-        //console.log(result)
         return result
     }
     getChartData(setStartToZero = false): { x: Date, y: number }[] {

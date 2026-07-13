@@ -38,7 +38,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
     var time = new Date().getTime()
 
 
-    //如果活动在进行中    
+    //如果活动在进行中
     if (cutoff.status == 'in_progress') {
         cutoff.predict()
         if (cutoff.predictEP == null || cutoff.predictEP == 0) {
@@ -76,7 +76,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
 
         //更新时间
         const finalTimeImage = drawList({
-            key: `更新时间 / ${mainServer==Server.jp?(cutoff.useSTAR_VIEWER?"STAR_VIEWER":"Bestdori"):(cutoff.useHHWX?"HHWX":"Bestdori")}`,
+            key: `更新时间 / ${cutoff.useSTAR_VIEWER ? "StarViewer" : (cutoff.useHHWX ? "HHWX" : "Bestdori")}`,
             text: `${changeTimePeriodFormat((new Date().getTime()) - cutoff.latestCutoff.time)}前`
         })
         tempImageList.push(finalTimeImage)
@@ -85,7 +85,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
         list.push(line)
         const tempList = []
         //活动剩余时间
-        
+
         tempList.push(drawList({
             key: '活动剩余时间',
             text: `${changeTimePeriodFormat(cutoff.endAt - time)}`

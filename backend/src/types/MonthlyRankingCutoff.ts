@@ -327,7 +327,7 @@ export class MonthlyRankingCutoff {
         // 1. 获取最新一个数据点及其服务器本地时间
         const lastCutoffIndex = this.cutoffs.length - 1;
         const lastCutoffTime = this.cutoffs[lastCutoffIndex].time;
-        // const lastCutoffEp = this.cutoffs[lastCutoffIndex].ep;
+        const lastCutoffEp = this.cutoffs[lastCutoffIndex].ep;
 
         const dateNow = getDateByServerTimezone(lastCutoffTime, this.server);
         const targetHour = dateNow.getUTCHours();
@@ -335,8 +335,12 @@ export class MonthlyRankingCutoff {
 
         const curEventDays = this.getDaysOfEvent(lastCutoffTime);
 
-        const score4AM: number[] = []; // 存储每天 4 点的数据
-        const scoreCurrentTime: number[] = []; // 存储每天同时刻（当前时分）的数据
+        const targetMinutesOfDay = targetHour * 60 + targetMinute;
+
+        // 收集每天 4 点的数据（ep + 时间戳）
+        const score4AM: { ep: number; time: number }[] = [];
+        // 收集昨天的所有数据点，用于找最近邻
+        const yesterdayPoints: { ep: number; time: number }[] = [];
 
         // 2. 遍历筛选数据
         for (const c of this.cutoffs) {
@@ -354,34 +358,57 @@ export class MonthlyRankingCutoff {
 
             // 筛选凌晨 4 点的结算点
             if (h === 4 && m === 0) {
-                score4AM.push(c.ep);
+                score4AM.push({ ep: c.ep, time: timestamp });
             }
 
-            // 筛选与当前最新点“同华里（时:分）”的数据点
-            if (h === targetHour && m === targetMinute) {
-                scoreCurrentTime.push(c.ep);
+            // 收集昨天的所有数据点
+            if (d === (curEventDays - 1)) {
+                yesterdayPoints.push({ ep: c.ep, time: timestamp });
             }
         }
 
-        // 3. 校验数据完整性
-        // 理想情况下，score4AM 应包含：昨天4点、今天4点 (长度至少为2)
-        // scoreCurrentTime 应包含：昨天同时刻、今天当前时刻 (长度至少为2)
-        if (score4AM.length < 2 || scoreCurrentTime.length < 2) {
+        // 3. 校验数据完整性：score4AM 应包含昨天4点和今天4点（至少2个）
+        if (score4AM.length < 2) {
+            return '数据缺失';
+        }
+        if (yesterdayPoints.length === 0) {
             return '数据缺失';
         }
 
-        // 拿到最近两个周期的结算点
-        const today4AMEp = score4AM[score4AM.length - 1];
-        const yesterday4AMEp = score4AM[score4AM.length - 2];
+        // 在昨天的数据点中找最接近目标时刻的那个
+        let nearestPoint = yesterdayPoints[0];
+        let nearestDiff = Infinity;
+        for (const p of yesterdayPoints) {
+            const d = getDateByServerTimezone(p.time, this.server);
+            const minutesOfDay = d.getUTCHours() * 60 + d.getUTCMinutes();
+            const diff = Math.abs(minutesOfDay - targetMinutesOfDay);
+            if (diff < nearestDiff) {
+                nearestDiff = diff;
+                nearestPoint = p;
+            }
+        }
 
-        const todayCurrentEp = scoreCurrentTime[scoreCurrentTime.length - 1];
-        const yesterdayCurrentEp = scoreCurrentTime[scoreCurrentTime.length - 2];
+        // score4AM 最后两个：昨天4点、今天4点
+        const yesterday4AM = score4AM[score4AM.length - 2];
+        const today4AM = score4AM[score4AM.length - 1];
 
-        // 今日截止到目前的增量 = 当前分数 - 今天凌晨4点分数
-        const TodaysIncrement = todayCurrentEp - today4AMEp;
+        // 今天的时间跨度：从今天4点到现在
+        const todayTimeSpan = lastCutoffTime - today4AM.time;
+        // 昨天实际数据的时间跨度：从昨天4点到最近邻数据点
+        const yesterdayTimeSpan = nearestPoint.time - yesterday4AM.time;
 
-        // 昨天同时刻的整天增量 = 昨天同时刻分数 - 昨天凌晨4点分数
-        const YesterdaysIncrement = yesterdayCurrentEp - yesterday4AMEp;
+        if (todayTimeSpan <= 0 || yesterdayTimeSpan <= 0) {
+            return '数据缺失';
+        }
+
+        // 今日截止到目前的增量 = 当前ep - 今天4点ep
+        const TodaysIncrement = lastCutoffEp - today4AM.ep;
+
+        // 昨天实际增量（原始时间跨度）
+        const YesterdaysIncrementRaw = nearestPoint.ep - yesterday4AM.ep;
+
+        // 线性对齐：将昨天的增量按时间比例缩放到今天的等效时长
+        const YesterdaysIncrement = Math.round(YesterdaysIncrementRaw * (todayTimeSpan / yesterdayTimeSpan));
 
         // 4. 计算速率比值
         const rate: number = YesterdaysIncrement !== 0 ? TodaysIncrement / YesterdaysIncrement : 1;
