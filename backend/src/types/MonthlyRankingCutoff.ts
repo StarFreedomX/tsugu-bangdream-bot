@@ -16,7 +16,7 @@ type MonthlyRankingBorderResponse = {
 };
 
 type MonthlyRankingTopPoint = {
-    timestamp: number;
+    time: number;
     uid: number;
     value: number;
 };
@@ -507,11 +507,7 @@ export class MonthlyRankingCutoffTop {
             this.isExist = false;
             return;
         }
-        this.points = (topData.points ?? []).map((point) => ({
-            time: point.timestamp,
-            uid: point.uid,
-            value: point.value,
-        }));
+        this.points = (topData.points ?? []);
         this.users = (topData.users ?? []).map((user) => ({
             ...user,
             ranking: 0,
