@@ -36,33 +36,47 @@ export async function drawMonthlyRankingCutoffDetail(monthlyRankingId: number, t
     if (cutoff.status == 'in_progress') {
         cutoff.predict();
         const predictText = cutoff.predictEP == null || cutoff.predictEP == 0 ? '?' : cutoff.predictEP.toString();
-        const cutoffs = cutoff.cutoffs;
-        const lastep = cutoffs.length > 1 ? cutoffs[cutoffs.length - 2].ep : 0;
-        const timeSpan = (cutoffs.length > 1 ? cutoff.latestCutoff.time - cutoffs[cutoffs.length - 2].time : cutoff.latestCutoff.time - cutoff.startAt) / (1000 * 3600);
-        let smoothRate = 0;
+        // 当前时速与线性外推：取最近点及30分钟前最近的数据点，排除距当前<10min的点
+        const cutoffs = cutoff.cutoffs
+        let smoothRate = 0
         if (cutoffs && cutoffs.length >= 2) {
-            const lastPoint = cutoffs[cutoffs.length - 1];
+            const lastPoint = cutoffs[cutoffs.length - 1]
+            const targetTime = lastPoint.time - 30 * 60 * 1000
+            const minGap = 10 * 60 * 1000
+            let prevPoint: { time: number; ep: number } | null = null
+            let minDiff = Infinity
 
-            // 向前寻找大约 1 小时前（3600000 毫秒）的数据点
-            const oneHourAgoTime = lastPoint.time - 3600000;
-            let prevPoint = cutoffs[0];
-
-            for (let i = cutoffs.length - 1; i >= 0; i--) {
-                if (cutoffs[i].time <= oneHourAgoTime) {
-                    prevPoint = cutoffs[i];
-                    break;
+            for (let i = 0; i < cutoffs.length - 1; i++) {
+                if (lastPoint.time - cutoffs[i].time < minGap) continue
+                const diff = Math.abs(cutoffs[i].time - targetTime)
+                if (diff < minDiff) {
+                    minDiff = diff
+                    prevPoint = cutoffs[i]
                 }
             }
 
-            // 计算实际的时间差（小时）和分数差
-            const dt = (lastPoint.time - prevPoint.time) / 3600000;
-            if (dt > 0) {
-                smoothRate = (lastPoint.ep - prevPoint.ep) / dt; // 单位：EP/小时
+            if (prevPoint) {
+                const dt = (lastPoint.time - prevPoint.time) / 3600000
+                if (dt > 0) {
+                    smoothRate = (lastPoint.ep - prevPoint.ep) / dt // 单位：EP/小时
+                }
+            }
+            else {
+                const timeSpan = (cutoff.latestCutoff.time - cutoff.startAt) / 3600000
+                if (timeSpan > 0) {
+                    smoothRate = cutoff.latestCutoff.ep / timeSpan
+                }
+            }
+        }
+        else if (cutoffs && cutoffs.length === 1) {
+            const timeSpan = (cutoff.latestCutoff.time - cutoff.startAt) / 3600000
+            if (timeSpan > 0) {
+                smoothRate = cutoff.latestCutoff.ep / timeSpan
             }
         }
         list.push(drawListMerge([
             drawList({ key: '预测线', text: predictText }),
-            drawList({ key: '当前时速', text: `${ Math.round((cutoff.latestCutoff.ep - lastep) / timeSpan) } pt/h` }),
+            drawList({ key: '当前时速', text: `${ Math.round(smoothRate) } pt/h` }),
             drawList({ key: '线性外推', text: cutoffs[cutoffs.length - 1] ? Math.round(cutoffs[cutoffs.length - 1].ep + smoothRate * ((cutoff.endAt - cutoffs[cutoffs.length - 1].time) / 3600000)).toString() : '无数据' })
         ]));
         list.push(line);

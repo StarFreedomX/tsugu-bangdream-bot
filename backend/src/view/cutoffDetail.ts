@@ -48,10 +48,44 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
             var predictText = cutoff.predictEP.toString()
         }
 
-        //预测线和时速
+        //预测线和时速：取最近点及30分钟前最近的数据点，排除距当前<10min的点
         const cutoffs = cutoff.cutoffs
-        const lastep = cutoffs.length > 1 ? cutoffs[cutoffs.length - 2].ep : 0
-        const timeSpan = (cutoffs.length > 1 ? cutoff.latestCutoff.time - cutoffs[cutoffs.length - 2].time : cutoff.latestCutoff.time - cutoff.startAt) / (1000 * 3600)
+        let speed30min = 0
+        if (cutoffs && cutoffs.length >= 2) {
+            const lastPoint = cutoffs[cutoffs.length - 1]
+            const targetTime = lastPoint.time - 30 * 60 * 1000
+            const minGap = 10 * 60 * 1000
+            let prevPoint: { time: number; ep: number } | null = null
+            let minDiff = Infinity
+
+            for (let i = 0; i < cutoffs.length - 1; i++) {
+                if (lastPoint.time - cutoffs[i].time < minGap) continue
+                const diff = Math.abs(cutoffs[i].time - targetTime)
+                if (diff < minDiff) {
+                    minDiff = diff
+                    prevPoint = cutoffs[i]
+                }
+            }
+
+            if (prevPoint) {
+                const dt = (lastPoint.time - prevPoint.time) / 3600000
+                if (dt > 0) {
+                    speed30min = Math.round((lastPoint.ep - prevPoint.ep) / dt)
+                }
+            }
+            else {
+                const timeSpan = (cutoff.latestCutoff.time - cutoff.startAt) / 3600000
+                if (timeSpan > 0) {
+                    speed30min = Math.round(cutoff.latestCutoff.ep / timeSpan)
+                }
+            }
+        }
+        else if (cutoffs && cutoffs.length === 1) {
+            const timeSpan = (cutoff.latestCutoff.time - cutoff.startAt) / 3600000
+            if (timeSpan > 0) {
+                speed30min = Math.round(cutoff.latestCutoff.ep / timeSpan)
+            }
+        }
         list.push(drawListMerge([
             drawList({
                 key: '预测线',
@@ -60,7 +94,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
 
             drawList({
                 key: '当前时速',
-                text: `${Math.round((cutoff.latestCutoff.ep - lastep) / timeSpan)} pt/h`
+                text: `${speed30min} pt/h`
             })
         ]))
         list.push(line)
@@ -92,7 +126,7 @@ export async function drawCutoffDetail(eventId: number, tier: number, mainServer
         }))
         tempList.push(drawList({
             key: '线性外推',
-            text: (cutoffs[cutoffs.length - 1])?Math.round(((cutoff.latestCutoff.ep - lastep) / timeSpan) * ((event.endAt[mainServer] - cutoffs[cutoffs.length - 1].time) / 3600000) + cutoffs[cutoffs.length - 1].ep).toString():'无数据'
+            text: (cutoffs[cutoffs.length - 1] && speed30min > 0)?Math.round(speed30min * ((event.endAt[mainServer] - cutoffs[cutoffs.length - 1].time) / 3600000) + cutoffs[cutoffs.length - 1].ep).toString():'无数据'
         })),
         list.push(drawListMerge(tempList))
         list.push(line)
