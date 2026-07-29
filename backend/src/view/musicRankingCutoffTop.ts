@@ -84,5 +84,7 @@ async function drawMusicRankingTopChart(cutoffTop: MusicRankingCutoffTop) {
         end: new Date(cutoffTop.endAt),
         setYStartToZero: false,
         useSegmentDash: false,
+        hideSegmentGapMinutes: 30,
+        excludeFirst24h: true,
     }, true);
 }

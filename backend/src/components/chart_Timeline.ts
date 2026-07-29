@@ -22,6 +22,8 @@ interface drawTimeLineChartOptions {
     setStartToZero?: boolean;
     setYStartToZero?: boolean;
     useSegmentDash?: boolean;
+    hideSegmentGapMinutes?: number;
+    excludeFirst24h?: boolean;
     data: {
         datasets: any[];
     };
@@ -29,7 +31,7 @@ interface drawTimeLineChartOptions {
 
 // 6. 主函数：生成时间轴图表
 export async function drawTimeLineChart(
-    {start, end, setStartToZero = false, setYStartToZero = true, useSegmentDash = true, data}: drawTimeLineChartOptions,
+    {start, end, setStartToZero = false, setYStartToZero = true, useSegmentDash = true, hideSegmentGapMinutes, excludeFirst24h, data}: drawTimeLineChartOptions,
     displayLabel = false
 ) {
     const width = 800;
@@ -39,18 +41,26 @@ export async function drawTimeLineChart(
     const canvas = new Canvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 8. 计算 y 轴最大值
-    const yMax = Math.max(
-        ...data.datasets.map((dataset: any) =>
-            Math.max(...dataset.data.map((pt: any) => pt.y))
-        )
-    );
-    // 计算 y 轴最小值
-    const yMin = setYStartToZero ? 0 : Math.max(
-        ...data.datasets.map((dataset: any) =>
-            Math.min(...dataset.data.map((pt: any) => pt.y))
-        )
-    );
+    // 8. 计算 y 轴范围（歌榜前十线排除前24h的低分数据）
+    const yRangeStart = excludeFirst24h ? start.getTime() + 24 * 60 * 60 * 1000 : 0;
+
+    const yMaxValues = data.datasets.map((dataset: any) => {
+        const pts = dataset.data.filter((pt: any) => pt.x.getTime() >= yRangeStart);
+        return pts.length ? Math.max(...pts.map((pt: any) => pt.y)) : NaN;
+    }).filter((v: number) => !isNaN(v));
+    const yMax = (yMaxValues.length ? Math.max(...yMaxValues) : Math.max(
+        ...data.datasets.map((dataset: any) => Math.max(...dataset.data.map((pt: any) => pt.y)))
+    )) * 0.91;
+
+    const yMin = setYStartToZero ? 0 : (() => {
+        const yMinValues = data.datasets.map((dataset: any) => {
+            const pts = dataset.data.filter((pt: any) => pt.x.getTime() >= yRangeStart);
+            return pts.length ? Math.min(...pts.map((pt: any) => pt.y)) : NaN;
+        }).filter((v: number) => !isNaN(v));
+        return yMinValues.length ? Math.max(...yMinValues) * 1.097 : 0;
+    })();
+
+    console.log(`yRangeStart: ${new Date(yRangeStart).toLocaleString()}, yMin: ${yMin}, yMax: ${yMax}`);
 
     //10. 虚线（仅活动/月榜等连续数据需要，歌榜稀疏数据跳过）
     if (useSegmentDash) {
@@ -65,6 +75,21 @@ export async function drawTimeLineChart(
                 borderDash,
             },
         )
+    }
+
+    //10.5. 歌榜间隔过大不连线（>hideSegmentGapMinutes 分钟则隐藏线段）
+    if (hideSegmentGapMinutes && hideSegmentGapMinutes > 0) {
+        for (const dataset of data.datasets) {
+            dataset.segment = {
+                ...(dataset.segment || {}),
+                borderColor: (ctx: any) => {
+                    const p0 = ctx.p0.parsed.x as number;
+                    const p1 = ctx.p1.parsed.x as number;
+                    const diffMinutes = (p1 - p0) / (1000 * 60);
+                    return diffMinutes > hideSegmentGapMinutes ? 'transparent' : undefined;
+                },
+            };
+        }
     }
 
     // 9. 配置 Chart.js 选项
