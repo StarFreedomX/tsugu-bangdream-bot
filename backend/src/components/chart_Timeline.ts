@@ -41,26 +41,44 @@ export async function drawTimeLineChart(
     const canvas = new Canvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // 8. 计算 y 轴范围（歌榜前十线排除前24h的低分数据）
-    const yRangeStart = excludeFirst24h ? start.getTime() + 24 * 60 * 60 * 1000 : 0;
+    // 8. 计算 y 轴范围
+    let yMin: number;
+    let yMax: number;
 
-    const yMaxValues = data.datasets.map((dataset: any) => {
-        const pts = dataset.data.filter((pt: any) => pt.x.getTime() >= yRangeStart);
-        return pts.length ? Math.max(...pts.map((pt: any) => pt.y)) : NaN;
-    }).filter((v: number) => !isNaN(v));
-    const yMax = (yMaxValues.length ? Math.max(...yMaxValues) : Math.max(
-        ...data.datasets.map((dataset: any) => Math.max(...dataset.data.map((pt: any) => pt.y)))
-    )) * 0.91;
-
-    const yMin = setYStartToZero ? 0 : (() => {
-        const yMinValues = data.datasets.map((dataset: any) => {
-            const pts = dataset.data.filter((pt: any) => pt.x.getTime() >= yRangeStart);
-            return pts.length ? Math.min(...pts.map((pt: any) => pt.y)) : NaN;
-        }).filter((v: number) => !isNaN(v));
-        return yMinValues.length ? Math.max(...yMinValues) * 1.097 : 0;
-    })();
-
-    console.log(`yRangeStart: ${new Date(yRangeStart).toLocaleString()}, yMin: ${yMin}, yMax: ${yMax}`);
+    if (excludeFirst24h) {
+        // 歌榜前十线：排除前24h数据，取极差±10%作为视口
+        const yRangeStart = start.getTime() + 24 * 60 * 60 * 1000;
+        const allY: number[] = [];
+        for (const ds of data.datasets) {
+            for (const pt of ds.data) {
+                if (pt.x.getTime() >= yRangeStart) {
+                    allY.push(pt.y);
+                }
+            }
+        }
+        if (allY.length) {
+            yMin = Math.min(...allY);
+            yMax = Math.max(...allY);
+            const range = yMax - yMin;
+            const margin = Math.max(range * 0.1, 1000);
+            yMin = Math.max(0, yMin - margin);
+            yMax = yMax + margin;
+        } else {
+            yMin = 0;
+            yMax = 1;
+        }
+    } else {
+        yMax = Math.max(
+            ...data.datasets.map((dataset: any) =>
+                Math.max(...dataset.data.map((pt: any) => pt.y))
+            )
+        );
+        yMin = setYStartToZero ? 0 : Math.max(
+            ...data.datasets.map((dataset: any) =>
+                Math.min(...dataset.data.map((pt: any) => pt.y))
+            )
+        );
+    }
 
     //10. 虚线（仅活动/月榜等连续数据需要，歌榜稀疏数据跳过）
     if (useSegmentDash) {
@@ -115,8 +133,12 @@ export async function drawTimeLineChart(
                 display: !setStartToZero,
             },
             y: {
-                min: (setYStartToZero || yMin < 1000) ? 0 : (yMin - 1000) * 0.9,
-                max: (yMax + 1000) * 1.1,
+                min: excludeFirst24h
+                    ? yMin
+                    : (setYStartToZero || yMin < 1000) ? 0 : (yMin - 1000) * 0.9,
+                max: excludeFirst24h
+                    ? yMax
+                    : (yMax + 1000) * 1.1,
             },
         },
     };
